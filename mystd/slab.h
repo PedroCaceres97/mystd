@@ -1,4 +1,4 @@
-#include <mystd/stdlib.h>
+#include <mystd/stdio.h>
 
 #ifndef MY_SLAB_NAME
     #define MY_SLAB_NAME MySlabInt
@@ -66,7 +66,7 @@ MY_SLAB_DATA_TYPE*    MY_SLAB_FN_ALLOC(MY_SLAB_STRUCT* slab);
 void                  MY_SLAB_FN_FOR_EACH(MY_SLAB_STRUCT* slab, void* user, bool (*each)(MY_SLAB_DATA_TYPE*, void*));
 
 size_t                MY_SLAB_FN_SIZE(MY_SLAB_STRUCT* slab);
-void                  MY_SLAB_FN_DUMP(MY_SLAB_STRUCT* slab, MyFile file);
+void                  MY_SLAB_FN_DUMP(MY_SLAB_STRUCT* slab, MyFile* file);
 
 struct MY_SLAB_BLOCK_STRUCT {
     int                             allocated;

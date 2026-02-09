@@ -59,8 +59,10 @@
 /* size_t Size ----------------------------------------------------------- */
 #if (SIZE_MAX == 0xFFFFFFFFFFFFFFFF)
     #define MY_SIZE_64BIT
-#elif (SIZE_MAX == 0xFFFFFFFF)
+    #define MY_SSIZE_T signed long long
+    #elif (SIZE_MAX == 0xFFFFFFFF)
     #define MY_SIZE_32BIT
+    #define MY_SSIZE_T signed int
 #else
     #define MY_SIZE_UNKOWN
 #endif

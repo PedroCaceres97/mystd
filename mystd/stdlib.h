@@ -188,6 +188,18 @@ const char* MySizetos(size_t value);
 
 #if defined(MY_OS_WINDOWS)
     #include <windows.h>
+
+    void MyWindowsPrintLastError() {
+        LPVOID lpMsgBuf;
+        DWORD dw = GetLastError(); 
+        MY_ASSERT(FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL), "Failed to format windows error");
+        MyRawError("\nWindows error ");
+        MyRawError(MyU32tos((uint32_t)dw, false, false));
+        MyRawError(": ");
+        MyRawError((char*)lpMsgBuf);
+        MyRawError("\n\n");
+        LocalFree(lpMsgBuf);
+    }
 #elif defined(MY_OS_LINUX)
 
 #endif
@@ -228,7 +240,7 @@ void MyAssertEmit(const char* msg, MyContext context) {
     cursor = MyRawStrcpy(cursor, end, "[MY_ASSERT FAILED]:\n Context: ");
     cursor = MyRawStrcpy(cursor, end, context.file);
     cursor = MyRawStrcpy(cursor, end, ":");
-    cursor = MyU32tos_(cursor, context.line);
+    cursor = MyU32tos_(context.line, cursor);
     cursor = MyRawStrcpy(cursor, end, " (");
     cursor = MyRawStrcpy(cursor, end, context.func);
     cursor = MyRawStrcpy(cursor, end, ")\n Message: ");
@@ -242,7 +254,7 @@ void MyAssertBoundsEmit(size_t idx, size_t bounds, MyContext context) {
     cursor = MyRawStrcpy(cursor, end, "[MY_ASSERT FAILED]:\n Context: ");
     cursor = MyRawStrcpy(cursor, end, context.file);
     cursor = MyRawStrcpy(cursor, end, ":");
-    cursor = MyU32tos_(cursor, context.line);
+    cursor = MyU32tos_(context.line, cursor);
     cursor = MyRawStrcpy(cursor, end, " (");
     cursor = MyRawStrcpy(cursor, end, context.func);
     cursor = MyRawStrcpy(cursor, end, ")\n Message: Index (");
@@ -404,7 +416,7 @@ char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
 static thread_local char myTosBuffers[MY_TOS_BUFFERS][MY_TOS_BUFFER_SIZE];
 static thread_local uint32_t myTosIndex = 0;
 
-static const char MY_DIGITS[200] =
+static const char MY_DIGITS[201] =
     "00010203040506070809"
     "10111213141516171819"
     "20212223242526272829"
@@ -416,7 +428,7 @@ static const char MY_DIGITS[200] =
     "80818283848586878889"
     "90919293949596979899";
 
-static const char MY_HEX_PAIR[512] =
+static const char MY_HEX_PAIR[513] =
 	"000102030405060708090A0B0C0D0E0F"
 	"101112131415161718191A1B1C1D1E1F"
 	"202122232425262728292A2B2C2D2E2F"
@@ -699,7 +711,7 @@ const char* MySizetos(size_t value) {
 #elif defined(MY_SIZE_64BIT)
     return MyU64tos((uint64_t)(uintptr_t)value, false, false);
 #else
-    MY_ASSERT(false, "Unsupported pointer size");
+    MY_ASSERT(false, "Unsupported size_t size");
 #endif
 }
 

@@ -55,5 +55,6 @@ dkms.conf
 *.dwo
 
 # Local
+.clangd
 .vscode/
 test/*.exe

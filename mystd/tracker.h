@@ -1,7 +1,7 @@
 #ifndef __MYSTD_TRACKER_H__
 #define __MYSTD_TRACKER_H__ 
 
-#include <mystd/stdlib.h>
+#include <mystd/stdio.h>
 
 #ifndef MY_TRACKER_NAME
     #define MY_TRACKER_NAME MyTracker
@@ -64,7 +64,7 @@ void*               MY_TRACKER_FN_DUPLICATE (MY_TRACKER_STRUCT* tracker, MyConte
 
 size_t              MY_TRACKER_FN_BYTES     (MY_TRACKER_STRUCT* tracker);
 size_t              MY_TRACKER_FN_COUNT     (MY_TRACKER_STRUCT* tracker);
-void                MY_TRACKER_FN_DUMP      (MY_TRACKER_STRUCT* tracker, MyFile file);
+void                MY_TRACKER_FN_DUMP      (MY_TRACKER_STRUCT* tracker, MyFile* file);
 
 struct MY_TRACKER_NODE_STRUCT {
     MY_TRACKER_PTRHDR_STRUCT*       data;
@@ -92,8 +92,6 @@ struct MY_TRACKER_STRUCT {
 };
 
 #ifdef MY_TRACKER_IMPLEMENTATION
-
-#include <mystd/printf.h>
 
 #define MY_TRACKER_FREE(ptr)                   do { free((void*)(ptr)); (ptr) = NULL;                                                                       } while(0)
 #define MY_TRACKER_MALLOC(v, type, size)       do { (v) = (type*)malloc((size));                MY_ASSERT_MALLOC((v), type, (size)); memset(v, 0, (size));  } while(0)
@@ -141,7 +139,6 @@ MY_TRACKER_STRUCT*  MY_TRACKER_FN_CREATE(MY_TRACKER_STRUCT* tracker, MyContext c
     }
 
     MY_RWLOCK_INIT(tracker->lock);
-    MY_TRACKER_LIST_FN_CREATE(&tracker->ptrs);
 
     tracker->bytes   = 0;
     tracker->context = context;
@@ -208,7 +205,7 @@ void*               MY_TRACKER_FN_ALLOC(MY_TRACKER_STRUCT* tracker, MyContext co
   MY_TRACKER_PTRHDR_STRUCT* hdr = NULL;
   MY_TRACKER_MALLOC(hdr, struct MY_TRACKER_PTRHDR_STRUCT, size + sizeof(struct MY_TRACKER_PTRHDR_STRUCT));
 
-  MY_TRACKER_LIST_FN_INSERT(&tracker->ptrs, &tracker->ptrs.back, &hdr->node);
+  MY_TRACKER_LIST_FN_INSERT(&tracker->ptrs, tracker->ptrs.back, &hdr->node);
   hdr->node.data = hdr;
   hdr->tracker = tracker;
   hdr->size = size;
@@ -275,7 +272,7 @@ size_t              MY_TRACKER_FN_COUNT(MY_TRACKER_STRUCT* tracker) {
   MY_ASSERT_PTR(tracker);
   return tracker->ptrs.size;
 }
-void                MY_TRACKER_FN_DUMP(MY_TRACKER_STRUCT* tracker, MyFile file) {
+void                MY_TRACKER_FN_DUMP(MY_TRACKER_STRUCT* tracker, MyFile* file) {
     MY_ASSERT_PTR(tracker);
 
     MyFprintf( 

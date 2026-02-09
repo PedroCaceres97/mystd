@@ -1,0 +1,1 @@
+gcc -O3 -g -std=c23 -I.. printf.c -o printf.exe

@@ -59,15 +59,18 @@
 /* size_t Size ----------------------------------------------------------- */
 #if (SIZE_MAX == 0xFFFFFFFFFFFFFFFF)
     #define MY_SIZE_64BIT
-    #define MY_SSIZE_T signed long long
-    #elif (SIZE_MAX == 0xFFFFFFFF)
+#elif (SIZE_MAX == 0xFFFFFFFF)
     #define MY_SIZE_32BIT
-    #define MY_SSIZE_T signed int
 #else
     #define MY_SIZE_UNKOWN
 #endif
 
-/* Compiler --------------------------------------------------------------- */
+/* MAX_PATH -------------------------------------------------------------- */
+#ifndef MY_MAX_PATH
+    #define MY_MAX_PATH 512
+#endif /* MY_MAX_PATH */
+
+/* Compiler -------------------------------------------------------------- */
 #if defined(__clang__)
   #define MY_COMPILER_CLANG
 #elif defined(__GNUC__)

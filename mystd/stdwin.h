@@ -3,7 +3,11 @@
 
 #include <mystd/stdlib.h>
 
+#include <io.h>
+#include <direct.h>
 #include <windows.h>
+
+#include <sys/stat.h>
 
 void MyWindowsPrintLastError();
 

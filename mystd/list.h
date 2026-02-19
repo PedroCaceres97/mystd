@@ -94,24 +94,24 @@ MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_PREV        (MY_LIST_NODE_STRUCT* node);
 MY_LIST_STRUCT*         MY_LIST_NODE_FN_LIST        (MY_LIST_NODE_STRUCT* node);
 
 struct MY_LIST_NODE_STRUCT {
-    int                     allocated;
     MY_LIST_DATA_TYPE       data;
     MY_LIST_NODE_STRUCT*    next;
     MY_LIST_NODE_STRUCT*    prev;
     MY_LIST_STRUCT*         list;
+    bool                    allocated;
 };
 
 struct MY_LIST_STRUCT {
-    int                     allocated;
     size_t                  size;
     MY_LIST_NODE_STRUCT*    front;
     MY_LIST_NODE_STRUCT*    back;
+    bool                    allocated;
     MY_RWLOCK_TYPE          lock;
 };
 
 #ifdef MY_LIST_IMPLEMENTATION
 
-MY_LIST_STRUCT* MY_LIST_FN_CREATE(MY_LIST_STRUCT* list) {
+MY_LIST_STRUCT*         MY_LIST_FN_CREATE           (MY_LIST_STRUCT* list) {
     if (!list) {
         MY_CALLOC(list, MY_LIST_STRUCT, 1);
         list->allocated = true;
@@ -126,7 +126,7 @@ MY_LIST_STRUCT* MY_LIST_FN_CREATE(MY_LIST_STRUCT* list) {
 
     return list;
 }
-void MY_LIST_FN_DESTROY(MY_LIST_STRUCT* list) {
+void                    MY_LIST_FN_DESTROY          (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     MY_ASSERT(list->size == 0, "Destroying non-empty list (HINT: Clear the list)");
 
@@ -137,24 +137,24 @@ void MY_LIST_FN_DESTROY(MY_LIST_STRUCT* list) {
     }
 }
 
-void MY_LIST_FN_RDLOCK(MY_LIST_STRUCT* list) {
+void                    MY_LIST_FN_RDLOCK           (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     MY_RWLOCK_RDLOCK(list->lock);
 }
-void MY_LIST_FN_WRLOCK(MY_LIST_STRUCT* list) {
+void                    MY_LIST_FN_WRLOCK           (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     MY_RWLOCK_WRLOCK(list->lock);
 }
-void MY_LIST_FN_RDUNLOCK(MY_LIST_STRUCT* list) {
+void                    MY_LIST_FN_RDUNLOCK         (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     MY_RWLOCK_RDUNLOCK(list->lock);
 }
-void MY_LIST_FN_WRUNLOCK(MY_LIST_STRUCT* list) {
+void                    MY_LIST_FN_WRUNLOCK         (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     MY_RWLOCK_WRUNLOCK(list->lock);
 }
 
-MY_LIST_NODE_STRUCT* MY_LIST_FN_GET(MY_LIST_STRUCT* list, size_t idx) {
+MY_LIST_NODE_STRUCT*    MY_LIST_FN_GET              (MY_LIST_STRUCT* list, size_t idx) {
     MY_ASSERT_PTR(list);
     MY_ASSERT_BOUNDS(idx, list->size);
 
@@ -172,20 +172,20 @@ MY_LIST_NODE_STRUCT* MY_LIST_FN_GET(MY_LIST_STRUCT* list, size_t idx) {
     }
     return current;
 }
-size_t MY_LIST_FN_SIZE(MY_LIST_STRUCT* list) {
+size_t                  MY_LIST_FN_SIZE             (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     return list->size;
 }
-MY_LIST_NODE_STRUCT* MY_LIST_FN_BACK(MY_LIST_STRUCT* list) {
+MY_LIST_NODE_STRUCT*    MY_LIST_FN_BACK             (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     return list->back;
 }
-MY_LIST_NODE_STRUCT* MY_LIST_FN_FRONT(MY_LIST_STRUCT* list) {
+MY_LIST_NODE_STRUCT*    MY_LIST_FN_FRONT            (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
     return list->front;
 }
 
-void MY_LIST_FN_CLEAR(MY_LIST_STRUCT* list, int deallocate) {
+void                    MY_LIST_FN_CLEAR            (MY_LIST_STRUCT* list, int deallocate) {
     MY_ASSERT_PTR(list);
 
     if (list->size == 0) {
@@ -210,7 +210,7 @@ void MY_LIST_FN_CLEAR(MY_LIST_STRUCT* list, int deallocate) {
     list->front = NULL;
     list->back = NULL;
 }
-void MY_LIST_FN_ERASE(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node, int deallocate) {
+void                    MY_LIST_FN_ERASE            (MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node, int deallocate) {
     MY_ASSERT_PTR(list);
     MY_ASSERT_PTR(node);
     MY_ASSERT(node->list == list, "Erasing a foreign node");
@@ -237,7 +237,7 @@ void MY_LIST_FN_ERASE(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node, int deall
         node->prev = NULL;
     }
 }
-void MY_LIST_FN_POP_BACK(MY_LIST_STRUCT* list, int deallocate) {
+void                    MY_LIST_FN_POP_BACK         (MY_LIST_STRUCT* list, int deallocate) {
     MY_ASSERT_PTR(list);
 
     if (list->size == 0) {
@@ -247,7 +247,7 @@ void MY_LIST_FN_POP_BACK(MY_LIST_STRUCT* list, int deallocate) {
 
     MY_LIST_FN_ERASE(list, list->back, deallocate);
 }
-void MY_LIST_FN_POP_FRONT(MY_LIST_STRUCT* list, int deallocate) {
+void                    MY_LIST_FN_POP_FRONT        (MY_LIST_STRUCT* list, int deallocate) {
     MY_ASSERT_PTR(list);
 
     if (list->size == 0) {
@@ -258,7 +258,7 @@ void MY_LIST_FN_POP_FRONT(MY_LIST_STRUCT* list, int deallocate) {
     MY_LIST_FN_ERASE(list, list->front, deallocate);
 }
 
-void MY_LIST_FN_INSERT_NEXT(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* pivot, MY_LIST_NODE_STRUCT* node) {
+void                    MY_LIST_FN_INSERT_NEXT      (MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* pivot, MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(list);
     MY_ASSERT_PTR(pivot);
     MY_ASSERT_PTR(node);
@@ -279,7 +279,7 @@ void MY_LIST_FN_INSERT_NEXT(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* pivot, MY
     pivot->next = node;
     list->size++;
 }
-void MY_LIST_FN_INSERT_PREV(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* pivot, MY_LIST_NODE_STRUCT* node) {
+void                    MY_LIST_FN_INSERT_PREV      (MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* pivot, MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(list);
     MY_ASSERT_PTR(pivot);
     MY_ASSERT_PTR(node);
@@ -300,14 +300,14 @@ void MY_LIST_FN_INSERT_PREV(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* pivot, MY
     pivot->prev = node;
     list->size++;
 }
-void MY_LIST_FN_PUSH_BACK(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node) {
+void                    MY_LIST_FN_PUSH_BACK        (MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(list);
     MY_ASSERT_PTR(node);
     MY_ASSERT(node->list == NULL, "Pushing a foreign node (HINT: Duplicate the node)");
 
     MY_LIST_FN_INSERT_NEXT(list, list->back, node);
 }
-void MY_LIST_FN_PUSH_FRONT(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node) {
+void                    MY_LIST_FN_PUSH_FRONT       (MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(list);
     MY_ASSERT_PTR(node);
     MY_ASSERT(node->list == NULL, "Pushing a foreign node (HINT: Duplicate the node)");
@@ -315,7 +315,7 @@ void MY_LIST_FN_PUSH_FRONT(MY_LIST_STRUCT* list, MY_LIST_NODE_STRUCT* node) {
     MY_LIST_FN_INSERT_PREV(list, list->front, node);
 }
 
-MY_LIST_NODE_STRUCT* MY_LIST_NODE_FN_CREATE(MY_LIST_NODE_STRUCT* node) {
+MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_CREATE      (MY_LIST_NODE_STRUCT* node) {
     if (!node) {
         MY_CALLOC(node, MY_LIST_NODE_STRUCT, 1);
         node->allocated = true;
@@ -330,7 +330,7 @@ MY_LIST_NODE_STRUCT* MY_LIST_NODE_FN_CREATE(MY_LIST_NODE_STRUCT* node) {
 
     return node;
 }
-MY_LIST_NODE_STRUCT* MY_LIST_NODE_FN_DUPLICATE(MY_LIST_NODE_STRUCT* src, MY_LIST_NODE_STRUCT* dst) {
+MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_DUPLICATE   (MY_LIST_NODE_STRUCT* src, MY_LIST_NODE_STRUCT* dst) {
     MY_ASSERT_PTR(src);
 
     dst = MY_LIST_NODE_FN_CREATE(dst);
@@ -338,7 +338,7 @@ MY_LIST_NODE_STRUCT* MY_LIST_NODE_FN_DUPLICATE(MY_LIST_NODE_STRUCT* src, MY_LIST
 
     return dst;
 }
-void MY_LIST_NODE_FN_DESTROY(MY_LIST_NODE_STRUCT* node) {
+void                    MY_LIST_NODE_FN_DESTROY     (MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(node);
     MY_ASSERT(node->list == NULL, "Destroying an attached node (HINT: Set deallocate to true in any list erasing function)");
 
@@ -347,23 +347,23 @@ void MY_LIST_NODE_FN_DESTROY(MY_LIST_NODE_STRUCT* node) {
     }
 }
 
-void MY_LIST_NODE_FN_SET(MY_LIST_NODE_STRUCT* node, MY_LIST_DATA_TYPE value) {
+void                    MY_LIST_NODE_FN_SET         (MY_LIST_NODE_STRUCT* node, MY_LIST_DATA_TYPE value) {
     MY_ASSERT_PTR(node);
     node->data = value;
 }
-MY_LIST_DATA_TYPE MY_LIST_NODE_FN_GET(MY_LIST_NODE_STRUCT* node) {
+MY_LIST_DATA_TYPE       MY_LIST_NODE_FN_GET         (MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(node);
     return node->data;
 }
-MY_LIST_NODE_STRUCT* MY_LIST_NODE_FN_NEXT(MY_LIST_NODE_STRUCT* node) {
+MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_NEXT        (MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(node);
     return node->next;
 }
-MY_LIST_NODE_STRUCT* MY_LIST_NODE_FN_PREV(MY_LIST_NODE_STRUCT* node) {
+MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_PREV        (MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(node);
     return node->prev;
 }
-MY_LIST_STRUCT* MY_LIST_NODE_FN_LIST(MY_LIST_NODE_STRUCT* node) {
+MY_LIST_STRUCT*         MY_LIST_NODE_FN_LIST        (MY_LIST_NODE_STRUCT* node) {
     MY_ASSERT_PTR(node);
     return node->list;
 }

@@ -1,6 +1,6 @@
 #include <mystd/string.h>
 
-MyString* MyString_Create(MyString* str) {
+MyString*   MyString_Create     (MyString* str) {
     if (!str) {
         MY_CALLOC(str, MyString, 1);
         str->allocated = true;
@@ -15,7 +15,7 @@ MyString* MyString_Create(MyString* str) {
 
     return str;
 }
-void MyString_Destroy(MyString* str) {
+void        MyString_Destroy    (MyString* str) {
     MY_ASSERT_PTR(str);
 
     MY_RWLOCK_DESTROY(str->lock);
@@ -26,45 +26,45 @@ void MyString_Destroy(MyString* str) {
     }
 }
 
-void MyString_Rdlock(MyString* str) {
+void        MyString_Rdlock     (MyString* str) {
     MY_ASSERT_PTR(str);
     MY_RWLOCK_RDLOCK(str->lock);
 }
-void MyString_Wrlock(MyString* str) {
+void        MyString_Wrlock     (MyString* str) {
     MY_ASSERT_PTR(str);
     MY_RWLOCK_WRLOCK(str->lock);
 }
-void MyString_Rdunlock(MyString* str) {
+void        MyString_Rdunlock   (MyString* str) {
     MY_ASSERT_PTR(str);
     MY_RWLOCK_RDUNLOCK(str->lock);
 }
-void MyString_Wrunlock(MyString* str) {
+void        MyString_Wrunlock   (MyString* str) {
     MY_ASSERT_PTR(str);
     MY_RWLOCK_WRUNLOCK(str->lock);
 }
 
-char* MyString_Cstr(MyString* str) {
+char*       MyString_Cstr       (MyString* str) {
     MY_ASSERT_PTR(str);
     return str->data;
 }
-size_t MyString_Size(MyString* str) {
+size_t      MyString_Size       (MyString* str) {
     MY_ASSERT_PTR(str);
     return str->size;
 }
 
-void MyString_Set(MyString* str, size_t idx, char c) {
+void        MyString_Set        (MyString* str, size_t idx, char c) {
     MY_ASSERT_PTR(str);
     MY_ASSERT_BOUNDS(idx, str->size);
 
     str->data[idx] = c;
 }
-char MyString_Get(MyString* str, size_t idx) {
+char        MyString_Get        (MyString* str, size_t idx) {
     MY_ASSERT_PTR(str);
     MY_ASSERT_BOUNDS(idx, str->size);
 
     return str->data[idx];
 }
-void MyString_Resize(MyString* str, size_t size) {
+void        MyString_Resize     (MyString* str, size_t size) {
     MY_ASSERT_PTR(str);
 
     if (size == str->size) {
@@ -91,7 +91,7 @@ void MyString_Resize(MyString* str, size_t size) {
     str->size = size;
     str->data[str->size] = '\0';
 }
-void MyString_Shrink(MyString* str) {
+void        MyString_Shrink     (MyString* str) {
     MY_ASSERT_PTR(str);
 
     if (str->size < MY_STRING_SHRINK_POLICIE(str->capacity) && str->size < MY_STRING_INITIAL_SIZE) {
@@ -106,7 +106,7 @@ void MyString_Shrink(MyString* str) {
         str->data[str->size] = '\0';
     }
 }
-void MyString_Clear(MyString* str) {
+void        MyString_Clear      (MyString* str) {
     MY_ASSERT_PTR(str);
 
     str->size = 0;
@@ -115,7 +115,7 @@ void MyString_Clear(MyString* str) {
     MY_CALLOC(str->data, char, str->capacity + 1);
 }
 
-void MyString_Erase(MyString* str, size_t idx) {
+void        MyString_Erase      (MyString* str, size_t idx) {
     MY_ASSERT_PTR(str);
     MY_ASSERT_BOUNDS(idx, str->size);
 
@@ -127,7 +127,7 @@ void MyString_Erase(MyString* str, size_t idx) {
     str->data[str->size] = '\0';
     MyString_Shrink(str);
 }
-void MyString_PopBack(MyString* str) {
+void        MyString_PopBack    (MyString* str) {
     MY_ASSERT_PTR(str);
 
     if (str->size == 0) {
@@ -137,7 +137,7 @@ void MyString_PopBack(MyString* str) {
 
     MyString_Erase(str, str->size - 1);
 }
-void MyString_PopFront(MyString* str) {
+void        MyString_PopFront   (MyString* str) {
     MY_ASSERT_PTR(str);
 
     if (str->size == 0) {
@@ -148,7 +148,7 @@ void MyString_PopFront(MyString* str) {
     MyString_Erase(str, 0);
 }
 
-void MyString_Insert(MyString* str, size_t idx, char c) {
+void        MyString_Insert     (MyString* str, size_t idx, char c) {
     MY_ASSERT_PTR(str);
     MY_ASSERT_BOUNDS(idx, str->size + 1);
 
@@ -177,18 +177,18 @@ void MyString_Insert(MyString* str, size_t idx, char c) {
     str->data[idx] = c;
     str->data[str->size] = '\0';
 }
-void MyString_PushBack(MyString* str, char c) {
+void        MyString_PushBack   (MyString* str, char c) {
     MY_ASSERT_PTR(str);
 
     MyString_Insert(str, str->size, c);
 }
-void MyString_PushFront(MyString* str, char c) {
+void        MyString_PushFront  (MyString* str, char c) {
     MY_ASSERT_PTR(str);
 
     MyString_Insert(str, 0, c);
 }
 
-void MyString_Memcpy(MyString* str, size_t idx, const void* src, size_t count) {
+void        MyString_Memcpy     (MyString* str, size_t idx, const void* src, size_t count) {
     MY_ASSERT_PTR(str);
     MY_ASSERT_PTR(src);
 

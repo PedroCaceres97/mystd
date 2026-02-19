@@ -41,7 +41,6 @@ char* MyRawStrcpy(char* dst, const char* end, const char* src) {
     while (*src && dst < end) { *dst++ = *src++; }
     return dst;
 }
-
 size_t MyRawSnprintf(char* dst, size_t max, const char* format, ...) {
     if (!dst || !format || max == 0) return -1;
     va_list args;

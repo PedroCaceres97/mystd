@@ -65,35 +65,35 @@ extern "C" {
 struct MY_VECTOR_STRUCT;
 typedef struct MY_VECTOR_STRUCT MY_VECTOR_STRUCT;
 
-MY_VECTOR_STRUCT*       MY_VECTOR_FN_CREATE    (MY_VECTOR_STRUCT* vec);
-void                    MY_VECTOR_FN_DESTROY   (MY_VECTOR_STRUCT* vec);
+MY_VECTOR_STRUCT*       MY_VECTOR_FN_CREATE     (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_DESTROY    (MY_VECTOR_STRUCT* vec);
 
-void                    MY_VECTOR_FN_RDLOCK    (MY_VECTOR_STRUCT* vec);
-void                    MY_VECTOR_FN_WRLOCK    (MY_VECTOR_STRUCT* vec);
-void                    MY_VECTOR_FN_RDUNLOCK  (MY_VECTOR_STRUCT* vec);
-void                    MY_VECTOR_FN_WRUNLOCK  (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_RDLOCK     (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_WRLOCK     (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_RDUNLOCK   (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_WRUNLOCK   (MY_VECTOR_STRUCT* vec);
 
-MY_VECTOR_DATA_TYPE*    MY_VECTOR_FN_DATA      (MY_VECTOR_STRUCT* vec);
-size_t                  MY_VECTOR_FN_SIZE      (MY_VECTOR_STRUCT* vec);
-MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_BACK      (MY_VECTOR_STRUCT* vec);
-MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_FRONT     (MY_VECTOR_STRUCT* vec);
+MY_VECTOR_DATA_TYPE*    MY_VECTOR_FN_DATA       (MY_VECTOR_STRUCT* vec);
+size_t                  MY_VECTOR_FN_SIZE       (MY_VECTOR_STRUCT* vec);
+MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_BACK       (MY_VECTOR_STRUCT* vec);
+MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_FRONT      (MY_VECTOR_STRUCT* vec);
 
-void                    MY_VECTOR_FN_SET       (MY_VECTOR_STRUCT* vec, size_t idx,        MY_VECTOR_DATA_TYPE value);
-MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_GET       (MY_VECTOR_STRUCT* vec, size_t idx);
-void                    MY_VECTOR_FN_RESIZE    (MY_VECTOR_STRUCT* vec, size_t size);
-void                    MY_VECTOR_FN_SHRINK    (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_SET        (MY_VECTOR_STRUCT* vec, size_t idx,        MY_VECTOR_DATA_TYPE value);
+MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_GET        (MY_VECTOR_STRUCT* vec, size_t idx);
+void                    MY_VECTOR_FN_RESIZE     (MY_VECTOR_STRUCT* vec, size_t size);
+void                    MY_VECTOR_FN_SHRINK     (MY_VECTOR_STRUCT* vec);
 
-void                    MY_VECTOR_FN_CLEAR     (MY_VECTOR_STRUCT* vec);
-void                    MY_VECTOR_FN_ERASE     (MY_VECTOR_STRUCT* vec, size_t idx);
-void                    MY_VECTOR_FN_POP_BACK  (MY_VECTOR_STRUCT* vec);
-void                    MY_VECTOR_FN_POP_FRONT (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_CLEAR      (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_ERASE      (MY_VECTOR_STRUCT* vec, size_t idx);
+void                    MY_VECTOR_FN_POP_BACK   (MY_VECTOR_STRUCT* vec);
+void                    MY_VECTOR_FN_POP_FRONT  (MY_VECTOR_STRUCT* vec);
 
-void                    MY_VECTOR_FN_INSERT    (MY_VECTOR_STRUCT* vec, size_t idx,        MY_VECTOR_DATA_TYPE value);
-void                    MY_VECTOR_FN_PUSH_BACK (MY_VECTOR_STRUCT* vec,                    MY_VECTOR_DATA_TYPE value);
-void                    MY_VECTOR_FN_PUSH_FRONT(MY_VECTOR_STRUCT* vec,                    MY_VECTOR_DATA_TYPE value);
+void                    MY_VECTOR_FN_INSERT     (MY_VECTOR_STRUCT* vec, size_t idx,        MY_VECTOR_DATA_TYPE value);
+void                    MY_VECTOR_FN_PUSH_BACK  (MY_VECTOR_STRUCT* vec,                    MY_VECTOR_DATA_TYPE value);
+void                    MY_VECTOR_FN_PUSH_FRONT (MY_VECTOR_STRUCT* vec,                    MY_VECTOR_DATA_TYPE value);
 
-void                    MY_VECTOR_FN_MEMCPY    (MY_VECTOR_STRUCT* vec, size_t idx, const  MY_VECTOR_DATA_TYPE* src,  size_t count);
-void                    MY_VECTOR_FN_MEMSET    (MY_VECTOR_STRUCT* vec, size_t idx,        MY_VECTOR_DATA_TYPE value, size_t count);
+void                    MY_VECTOR_FN_MEMCPY     (MY_VECTOR_STRUCT* vec, size_t idx, const  MY_VECTOR_DATA_TYPE* src,  size_t count);
+void                    MY_VECTOR_FN_MEMSET     (MY_VECTOR_STRUCT* vec, size_t idx,        MY_VECTOR_DATA_TYPE value, size_t count);
 
 struct MY_VECTOR_STRUCT {
     MY_VECTOR_DATA_TYPE*    data;
@@ -105,7 +105,7 @@ struct MY_VECTOR_STRUCT {
 
 #ifdef MY_VECTOR_IMPLEMENTATION
 
-MY_VECTOR_STRUCT*       MY_VECTOR_FN_CREATE(MY_VECTOR_STRUCT* vec) {
+MY_VECTOR_STRUCT*       MY_VECTOR_FN_CREATE     (MY_VECTOR_STRUCT* vec) {
   if (!vec) {
     MY_CALLOC(vec, struct MY_VECTOR_STRUCT, 1);
     vec->allocated = true;
@@ -120,7 +120,7 @@ MY_VECTOR_STRUCT*       MY_VECTOR_FN_CREATE(MY_VECTOR_STRUCT* vec) {
 
   return vec;
 }
-void                    MY_VECTOR_FN_DESTROY(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_DESTROY    (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT(vec->size == 0, "Destroying non empty MY_VECTOR (HINT: Clear the MY_VECTOR)");
 
@@ -132,53 +132,53 @@ void                    MY_VECTOR_FN_DESTROY(MY_VECTOR_STRUCT* vec) {
   }
 }
 
-void                    MY_VECTOR_FN_RDLOCK(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_RDLOCK     (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_RWLOCK_RDLOCK(vec->lock);
 }
-void                    MY_VECTOR_FN_WRLOCK(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_WRLOCK     (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_RWLOCK_WRLOCK(vec->lock);
 }
-void                    MY_VECTOR_FN_RDUNLOCK(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_RDUNLOCK   (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_RWLOCK_RDUNLOCK(vec->lock);
 }
-void                    MY_VECTOR_FN_WRUNLOCK(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_WRUNLOCK   (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_RWLOCK_WRUNLOCK(vec->lock);
 }
 
-MY_VECTOR_DATA_TYPE*    MY_VECTOR_FN_DATA(MY_VECTOR_STRUCT* vec) {
+MY_VECTOR_DATA_TYPE*    MY_VECTOR_FN_DATA       (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   return vec->data;
 }
-size_t                  MY_VECTOR_FN_SIZE(MY_VECTOR_STRUCT* vec) {
+size_t                  MY_VECTOR_FN_SIZE       (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   return vec->size;
 }
-MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_BACK(MY_VECTOR_STRUCT* vec) {
+MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_BACK       (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT(vec->size != 0, "MY_VECTOR has no back (size == 0)");
   return vec->data[vec->size - 1];
 }
-MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_FRONT(MY_VECTOR_STRUCT* vec) {
+MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_FRONT      (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT(vec->size != 0, "MY_VECTOR has no front (size == 0)");
   return vec->data[0];
 }
 
-void                    MY_VECTOR_FN_SET(MY_VECTOR_STRUCT* vec, size_t idx, MY_VECTOR_DATA_TYPE value) {
+void                    MY_VECTOR_FN_SET        (MY_VECTOR_STRUCT* vec, size_t idx, MY_VECTOR_DATA_TYPE value) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT_BOUNDS(idx, vec->size);
   vec->data[idx] = value;
 }
-MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_GET(MY_VECTOR_STRUCT* vec, size_t idx) {
+MY_VECTOR_DATA_TYPE     MY_VECTOR_FN_GET        (MY_VECTOR_STRUCT* vec, size_t idx) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT_BOUNDS(idx, vec->size);
   return vec->data[idx];
 }
-void                    MY_VECTOR_FN_RESIZE(MY_VECTOR_STRUCT* vec, size_t size) {
+void                    MY_VECTOR_FN_RESIZE     (MY_VECTOR_STRUCT* vec, size_t size) {
   MY_ASSERT_PTR(vec);
 
   if (size == vec->size) {
@@ -212,7 +212,7 @@ void                    MY_VECTOR_FN_RESIZE(MY_VECTOR_STRUCT* vec, size_t size) 
   vec->data = data;
   vec->size = size;
 }
-void                    MY_VECTOR_FN_SHRINK(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_SHRINK     (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
 
   if (vec->size < MY_VECTOR_SHRINK_POLICIE(vec->capacity) && vec->size < MY_VECTOR_INITIAL_SIZE) {
@@ -226,7 +226,7 @@ void                    MY_VECTOR_FN_SHRINK(MY_VECTOR_STRUCT* vec) {
   }
 }
 
-void                    MY_VECTOR_FN_CLEAR(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_CLEAR      (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
 
   #ifdef MY_VECTOR_DEALLOCATE_DATA
@@ -240,7 +240,7 @@ void                    MY_VECTOR_FN_CLEAR(MY_VECTOR_STRUCT* vec) {
   MY_FREE(vec->data);
   MY_CALLOC(vec->data, MY_VECTOR_DATA_TYPE, vec->capacity);
 }
-void                    MY_VECTOR_FN_ERASE(MY_VECTOR_STRUCT* vec, size_t idx) {
+void                    MY_VECTOR_FN_ERASE      (MY_VECTOR_STRUCT* vec, size_t idx) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT_BOUNDS(idx, vec->size);
 
@@ -256,7 +256,7 @@ void                    MY_VECTOR_FN_ERASE(MY_VECTOR_STRUCT* vec, size_t idx) {
 
   MY_VECTOR_FN_SHRINK(vec);
 }
-void                    MY_VECTOR_FN_POP_BACK(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_POP_BACK   (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
 
   if (vec->size == 0) {
@@ -266,7 +266,7 @@ void                    MY_VECTOR_FN_POP_BACK(MY_VECTOR_STRUCT* vec) {
 
   MY_VECTOR_FN_ERASE(vec, vec->size - 1);
 }
-void                    MY_VECTOR_FN_POP_FRONT(MY_VECTOR_STRUCT* vec) {
+void                    MY_VECTOR_FN_POP_FRONT  (MY_VECTOR_STRUCT* vec) {
   MY_ASSERT_PTR(vec);
 
   if (vec->size == 0) {
@@ -277,7 +277,7 @@ void                    MY_VECTOR_FN_POP_FRONT(MY_VECTOR_STRUCT* vec) {
   MY_VECTOR_FN_ERASE(vec, 0);
 }
 
-void                    MY_VECTOR_FN_INSERT(MY_VECTOR_STRUCT* vec, size_t idx, MY_VECTOR_DATA_TYPE value) {
+void                    MY_VECTOR_FN_INSERT     (MY_VECTOR_STRUCT* vec, size_t idx, MY_VECTOR_DATA_TYPE value) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT_BOUNDS(idx, vec->size + 1);
 
@@ -305,18 +305,18 @@ void                    MY_VECTOR_FN_INSERT(MY_VECTOR_STRUCT* vec, size_t idx, M
   vec->data[idx] = value;
   vec->size++;
 }
-void                    MY_VECTOR_FN_PUSH_BACK(MY_VECTOR_STRUCT* vec, MY_VECTOR_DATA_TYPE value) {
+void                    MY_VECTOR_FN_PUSH_BACK  (MY_VECTOR_STRUCT* vec, MY_VECTOR_DATA_TYPE value) {
   MY_ASSERT_PTR(vec);
 
   MY_VECTOR_FN_INSERT(vec, vec->size, value);
 }
-void                    MY_VECTOR_FN_PUSH_FRONT(MY_VECTOR_STRUCT* vec, MY_VECTOR_DATA_TYPE value) {
+void                    MY_VECTOR_FN_PUSH_FRONT (MY_VECTOR_STRUCT* vec, MY_VECTOR_DATA_TYPE value) {
   MY_ASSERT_PTR(vec);
 
   MY_VECTOR_FN_INSERT(vec, 0, value);
 }
 
-void                    MY_VECTOR_FN_MEMCPY(MY_VECTOR_STRUCT* vec, size_t idx, const MY_VECTOR_DATA_TYPE* src, size_t count) {
+void                    MY_VECTOR_FN_MEMCPY     (MY_VECTOR_STRUCT* vec, size_t idx, const MY_VECTOR_DATA_TYPE* src, size_t count) {
   MY_ASSERT_PTR(vec);
   MY_ASSERT_PTR(src);
 
@@ -327,7 +327,7 @@ void                    MY_VECTOR_FN_MEMCPY(MY_VECTOR_STRUCT* vec, size_t idx, c
 
   memcpy(&vec->data[idx], src, count * sizeof(MY_VECTOR_DATA_TYPE));
 }
-void                    MY_VECTOR_FN_MEMSET(MY_VECTOR_STRUCT* vec, size_t idx, MY_VECTOR_DATA_TYPE value, size_t count) {
+void                    MY_VECTOR_FN_MEMSET     (MY_VECTOR_STRUCT* vec, size_t idx, MY_VECTOR_DATA_TYPE value, size_t count) {
   MY_ASSERT_PTR(vec);
 
   if (count == 0) { return; }

@@ -48,21 +48,30 @@
 #endif
 
 /* Pointer Size ----------------------------------------------------------- */
-#if UINTPTR_MAX == 0xffffffffffffffffULL
+#if UINTPTR_MAX == UINT64_MAX
   #define MY_PTR_64BIT
-#elif UINTPTR_MAX == 0xffffffffULL
+#elif UINTPTR_MAX == UINT32_MAX
   #define MY_PTR_32BIT
 #else 
   #define MY_PTR_UNKOWN
 #endif
 
 /* size_t Size ----------------------------------------------------------- */
-#if (SIZE_MAX == 0xFFFFFFFFFFFFFFFF)
+#if (SIZE_MAX == UINT64_MAX)
     #define MY_SIZE_64BIT
-#elif (SIZE_MAX == 0xFFFFFFFF)
+#elif (SIZE_MAX == UINT32_MAX)
     #define MY_SIZE_32BIT
 #else
     #define MY_SIZE_UNKOWN
+#endif
+
+/* ptrdiff_t Size ----------------------------------------------------------- */
+#if (PTRDIFF_MAX == INT64_MAX)
+    #define MY_PTRDIFF_64BIT
+#elif (PTRDIFF_MAX == INT32_MAX)
+    #define MY_PTRDIFF_32BIT
+#else
+    #define MY_PTRDIFF_UNKOWN
 #endif
 
 /* MAX_PATH -------------------------------------------------------------- */

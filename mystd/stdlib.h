@@ -11,7 +11,7 @@ void MyRawOutput(const char* msg);
 void MyRawError(const char* msg);
 
 char* MyRawStrcpy(char* dst, const char* end, const char* src);
-void MyRawSnprintf(char* dst, size_t size, const char* format, ...);
+size_t MyRawSnprintf(char* dst, size_t max, const char* format, ...);
 
 /* --------------------------------------------------------------------------
  * ASSERT
@@ -159,6 +159,7 @@ const char* MyF64tos(double value, int precision, bool plus, bool space);
 
 const char* MyPtrtos(void* value);
 const char* MySizetos(size_t value);
+const char* MyPtrdifftos(ptrdiff_t value);
 
 void MyNormalizePath(char* path);
 

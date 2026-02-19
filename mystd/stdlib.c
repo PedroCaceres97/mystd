@@ -1,4 +1,3 @@
-#include <__stdarg_va_list.h>
 #include <mystd/stdlib.h>
 
 #if defined(MY_OS_WINDOWS)
@@ -43,14 +42,14 @@ char* MyRawStrcpy(char* dst, const char* end, const char* src) {
     return dst;
 }
 
-void MyRawSnprintf(char* dst, size_t size, const char* format, ...) {
-    if (!dst || !format || size == 0) return;
+size_t MyRawSnprintf(char* dst, size_t max, const char* format, ...) {
+    if (!dst || !format || max == 0) return -1;
     va_list args;
     va_start(args, format);
 
     char ch = 0;
     const char* str= NULL;
-    size_t remaining = size;
+    size_t remaining = max;
     while (*format && remaining > 1) {
         if (*format != '%') {
             ch = *format;
@@ -61,30 +60,38 @@ void MyRawSnprintf(char* dst, size_t size, const char* format, ...) {
         if (*format == '%') {
             ch = '%';
             goto write_char;
-        } else if (*format == 'c') {
+        }
+        if (*format == 'c') {
             ch = (char)va_arg(args, int);
             goto write_char;
-        } else if (*format == 's') {
+        }
+        if (*format == 's') {
             str = va_arg(args, const char*);
-            if (!str) str = "(null)";
+            if (!str) { str = "(null)"; }
             goto write_string;
-        } else if (*format == 'i') {
+        }
+        if (*format == 'i') {
             int n = va_arg(args, int);
             str = MyI32tos(n, false, false);
             goto write_string;
-        } else if (*format == 'u') {
+        }
+        if (*format == 'u') {
             unsigned int n = va_arg(args, unsigned int);
             str = MyU32tos(n, false, false);
             goto write_string;
-        } else if (*format == 'z') {
+        }
+        if (*format == 'z') {
             size_t n = va_arg(args, size_t);
             str = MySizetos(n);
             goto write_string;
-        } else if (*format == 'f') {
+        } 
+        if (*format == 'f') {
             double n = va_arg(args, double);
             str = MyF64tos(n, 6, false, false);
             goto write_string;
         }
+
+        ch = *format;
 
     write_char:
         *dst++ = ch;
@@ -100,6 +107,7 @@ void MyRawSnprintf(char* dst, size_t size, const char* format, ...) {
 
     *dst = '\0';
     va_end(args);
+    return max - remaining;
 }
 
 /* --------------------------------------------------------------------------
@@ -554,20 +562,29 @@ MyF64tos_end:
 
 const char* MyPtrtos(void* value) {
 #if defined(MY_PTR_32BIT)
-    return MyX32tos((uint32_t)(uintptr_t)value);
+    return MyX32tos((uint32_t)value);
 #elif defined(MY_PTR_64BIT)
-    return MyX64tos((uint64_t)(uintptr_t)value);
+    return MyX64tos((uint64_t)value);
 #else
     MY_ASSERT(false, "Unsupported pointer size");
 #endif
 }
 const char* MySizetos(size_t value) {
 #if defined(MY_SIZE_32BIT)
-    return MyU32tos((uint32_t)(uintptr_t)value, false, false);
+    return MyU32tos((uint32_t)value, false, false);
 #elif defined(MY_SIZE_64BIT)
-    return MyU64tos((uint64_t)(uintptr_t)value, false, false);
+    return MyU64tos((uint64_t)value, false, false);
 #else
     MY_ASSERT(false, "Unsupported size_t size");
+#endif
+}
+const char* MyPtrdifftos(ptrdiff_t value) {
+#if defined(MY_PTRDIFF_32BIT)
+    return MyI32tos((uint32_t)value, false, false);
+#elif defined(MY_PTRDIFF_64BIT)
+    return MyI64tos((uint64_t)value, false, false);
+#else
+    MY_ASSERT(false, "Unsupported ptrdiff_t size");
 #endif
 }
 

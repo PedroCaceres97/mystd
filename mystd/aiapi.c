@@ -1,5 +1,9 @@
 #include <mystd/aiapi.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* --------------------------------------------------------------------------
  * Default macros
  * -------------------------------------------------------------------------- */
@@ -598,3 +602,7 @@ int       MyAIAPI_HistorySize   (MyAIAPI* api) {
     MY_ASSERT_PTR(api->messages);
     return cJSON_GetArraySize(api->messages);
 }
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,7 +1,7 @@
 #ifndef __MYSTD_STRING_H__
 #define __MYSTD_STRING_H__
 
-#include <mystd/stdlib.h>
+#include <mystd/stdio.h>
 
 #ifndef MY_STRING_RESIZE_POLICIE
     #define MY_STRING_RESIZE_POLICIE(size) (size * 2)

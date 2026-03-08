@@ -1,15 +1,18 @@
 #include <mystd/stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if defined(MY_OS_WINDOWS)
     #include <mystd/stdwin.h>
 
-    void MyWindowsPrintLastError() {
+    void MyWindowsPrintLastError(MyContext context) {
         LPVOID lpMsgBuf;
         DWORD dw = GetLastError(); 
+        MyAssertLog("Windows API error, next message will provide OS error message", context);
         MY_ASSERT(FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL), "Failed to format windows error");
-        char buffer[512] = {0};
-        MyRawSnprintf(buffer, sizeof(buffer), "\nWindows error %u: %s\n\n", (unsigned int)dw, lpMsgBuf);
-        MyRawError(buffer);
+        MyAssertLog(lpMsgBuf, context);
         LocalFree(lpMsgBuf);
     }
 #elif defined(MY_OS_LINUX)
@@ -158,6 +161,7 @@ char* MyAnsiFg256(uint8_t n) {
     buffer = MyU32tos_((uint32_t)n, buffer);
 
     *buffer++ = 'm';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiBg256(uint8_t n) {
@@ -173,6 +177,7 @@ char* MyAnsiBg256(uint8_t n) {
     buffer = MyU32tos_((uint32_t)n, buffer);
 
     *buffer++ = 'm';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
@@ -194,6 +199,7 @@ char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
     buffer = MyU32tos_((uint32_t)b, buffer);
 
     *buffer++ = 'm';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
@@ -215,6 +221,7 @@ char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
     buffer = MyU32tos_((uint32_t)b, buffer);
 
     *buffer++ = 'm';
+    *buffer++ = '\0';
     return buffer;
 }
 
@@ -226,6 +233,7 @@ char* MyAnsiCursorUp(uint16_t n) {
     buffer = MyU32tos_((uint32_t)n, buffer);
 
     *buffer++ = 'A';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiCursorDown(uint16_t n) {
@@ -236,6 +244,7 @@ char* MyAnsiCursorDown(uint16_t n) {
     buffer = MyU32tos_((uint32_t)n, buffer);
 
     *buffer++ = 'B';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiCursorForward(uint16_t n) {
@@ -246,6 +255,7 @@ char* MyAnsiCursorForward(uint16_t n) {
     buffer = MyU32tos_((uint32_t)n, buffer);
 
     *buffer++ = 'C';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiCursorBack(uint16_t n) {
@@ -256,6 +266,7 @@ char* MyAnsiCursorBack(uint16_t n) {
     buffer = MyU32tos_((uint32_t)n, buffer);
 
     *buffer++ = 'D';
+    *buffer++ = '\0';
     return buffer;
 }
 char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
@@ -269,6 +280,7 @@ char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
     buffer = MyU32tos_((uint32_t)x, buffer);
 
     *buffer++ = 'H';
+    *buffer++ = '\0';
     return buffer;
 }
 
@@ -595,3 +607,7 @@ void MyNormalizePath(char* path) {
     while (*path) { if (*path == '\\') { *path = '/'; } path++; }
 #endif
 }
+
+#ifdef __cplusplus
+}
+#endif

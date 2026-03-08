@@ -1,5 +1,9 @@
 #include <mystd/string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 MyString*   MyString_Create     (MyString* str) {
     if (!str) {
         MY_CALLOC(str, MyString, 1);
@@ -201,3 +205,7 @@ void        MyString_Memcpy     (MyString* str, size_t idx, const void* src, siz
 
     memcpy(&str->data[idx], src, count);
 }
+
+#ifdef __cplusplus
+}
+#endif

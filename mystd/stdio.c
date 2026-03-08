@@ -1,5 +1,9 @@
 #include <mystd/stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* --------------------------------------------------------------------------
  * LOG
  * -------------------------------------------------------------------------- */
@@ -16,8 +20,6 @@ static inline char* MyLogNextBuffer() {
 void MyLog_(MyLogLevel level, MyContext context, const char* msg) {
 #ifndef MY_LOG_DISABLE_ALL
     char* buffer = MyLogNextBuffer();
-    char* cursor = buffer;
-    char* end = buffer + MY_LOG_BUFFER_SIZE;
     MyFile* file = MY_LOG_STDOUT_FILE;
     const char* title = MY_LOG_TITLE;
     switch(level) {
@@ -68,16 +70,7 @@ void MyLog_(MyLogLevel level, MyContext context, const char* msg) {
         }
     }
 
-    cursor = MyRawStrcpy(cursor, end, title);
-    cursor = MyRawStrcpy(cursor, end, "\n Context: ");
-    cursor = MyRawStrcpy(cursor, end, context.file);
-    cursor = MyRawStrcpy(cursor, end, ":");
-    cursor = MyU32tos_(context.line, cursor);
-    cursor = MyRawStrcpy(cursor, end, " (");
-    cursor = MyRawStrcpy(cursor, end, context.func);
-    cursor = MyRawStrcpy(cursor, end, ")\n Message: ");
-    cursor = MyRawStrcpy(cursor, end, msg);
-    cursor = MyRawStrcpy(cursor, end, "\n\n");
+    MyRawSnprintf(buffer, MY_LOG_BUFFER_SIZE, "%s\n Context: %s:%u (%s)\n Message: %s\n\n", title, context.file, context.line, context.func, msg);
     MyFilePrint(file, buffer);
 #endif /* MY_LOG_DISABLE_ALL */
 }
@@ -152,6 +145,17 @@ MyFile* MyFileOpen(const char* path, MyFileFlag flag) {
     file->handle = CreateFileA(path, access, 0, NULL, creation, FILE_ATTRIBUTE_NORMAL, NULL);
     MY_ASSERT_WINHANDLE(file->handle);
     return file;
+}
+/* Must free manually */
+uint8_t* MyFileDump(const char* path, size_t* size) {
+    MyFile* file = MyFileOpen(path, MY_FILE_FLAG_READ);
+    size_t _size = MyFileSize(file);
+    char* bytes = NULL;
+    MY_CALLOC(bytes, char, _size);
+    MyFileRead(file, bytes, _size);
+    MyFileClose(file);
+    if (size) { *size = _size; }
+    return (uint8_t*)bytes;
 }
 
 size_t MyFileRead(MyFile* file, char* data, size_t max) {
@@ -262,8 +266,6 @@ bool MyFileExists(const char* path) {
  * PRINTF
  * -------------------------------------------------------------------------- */
 
-#define MY_VSN_UNSET -1
-
 static thread_local char myPrintfBuffers[MY_PRINTF_BUFFERS][MY_PRINTF_BUFFER_SIZE];
 static thread_local uint32_t myPrintfIndex = 0;
 
@@ -286,7 +288,7 @@ size_t MyPrintf(const char* format, ...) {
     MY_ASSERT_PTR(format);
     va_list args;
     va_start(args, format);
-    char buffer[MY_PRINTF_BUFFER_SIZE] = {0};
+    char* buffer = MyPrintfNextBuffer();
     size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
     MyFilePrint(MyStdout(), buffer);
     va_end(args);
@@ -305,7 +307,7 @@ size_t MyFprintf(MyFile* file, const char* format, ...) {
     MY_ASSERT_PTR(format);
     va_list args;
     va_start(args, format);
-    char buffer[MY_PRINTF_BUFFER_SIZE] = {0};
+    char* buffer = MyPrintfNextBuffer();
     size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
     MyFilePrint(file, buffer);
     va_end(args);
@@ -579,3 +581,7 @@ size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
     if (buffer) { *buffer = '\0'; } 
 	return written;
 }
+
+#ifdef __cplusplus
+}
+#endif

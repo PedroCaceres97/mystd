@@ -106,6 +106,7 @@ MyFile* MyStderr();
 
 void MyFileClose(MyFile* file);
 MyFile* MyFileOpen(const char* path, MyFileFlag flag);
+uint8_t* MyFileDump(const char* path, size_t* size); /* Must free manually */
 
 size_t MyFileRead(MyFile* file, char* data, size_t max);
 size_t MyFileWrite(MyFile* file, const char* data, size_t max);

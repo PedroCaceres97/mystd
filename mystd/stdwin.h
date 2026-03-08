@@ -9,9 +9,9 @@
 
 #include <sys/stat.h>
 
-void MyWindowsPrintLastError();
+void MyWindowsPrintLastError(MyContext context);
 
-#define MY_ASSERT_WIN(x) do { if (!(x)) { MyWindowsPrintLastError(); MyExit(); } } while(false);
+#define MY_ASSERT_WIN(x) do { if (!(x)) { MyWindowsPrintLastError(MY_CONTEXT(NULL)); MyExit(); } } while(false);
 #define MY_ASSERT_WINBOOL(x) MY_ASSERT_WIN(x);
 #define MY_ASSERT_WINHANDLE(x) MY_ASSERT_WIN((x) != INVALID_HANDLE_VALUE && (x) != NULL);
 

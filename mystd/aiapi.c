@@ -1,3 +1,4 @@
+#include "mystd/stddef.h"
 #include <mystd/aiapi.h>
 
 #ifdef __cplusplus
@@ -199,16 +200,12 @@ static MyAIAPITool* MyAIAPI_FindTool(MyAIAPI* api, const char* name) {
  * Implementation
  * -------------------------------------------------------------------------- */
 
+MY_RWLOCK_DEFINES(MyAIAPI, api, MyAIAPI)
+
 MyAIAPI*  MyAIAPI_Create        (MyAIAPI* api, MyAIAPIConfig config) {
     MY_ASSERT_PTR(config.model);
 
-    if (!api) {
-        MY_CALLOC(api, struct MyAIAPI, 1);
-        api->allocated = true;
-    }
-
-    MY_RWLOCK_INIT(api->lock);
-
+    MY_ADOPT_OR_ALLOC(api, MyAIAPI);
     memset(api->attached, 0, sizeof(api->attached));
     api->config = config;
 
@@ -324,12 +321,7 @@ void      MyAIAPI_Destroy       (MyAIAPI* api) {
     if (api->curl)      { curl_easy_cleanup(api->curl); }
 
     MY_FREE_IF(api->response);
-
-    MY_RWLOCK_DESTROY(api->lock);
-
-    if (api->allocated) {
-        MY_FREE(api);
-    }
+    MY_FREE_ADOPTED(api);
 }
 
 cJSON*    MyAIAPI_Send          (MyAIAPI* api, cJSON* message) {
@@ -478,23 +470,6 @@ cJSON*    MyAIAPI_Send          (MyAIAPI* api, cJSON* message) {
         cJSON_Delete(root);
         return response;
     }
-}
-
-void      MyAIAPI_Rdlock        (MyAIAPI* api) {
-    MY_ASSERT_PTR(api);
-    MY_RWLOCK_RDLOCK(api->lock);
-}
-void      MyAIAPI_Wrlock        (MyAIAPI* api) {
-    MY_ASSERT_PTR(api);
-    MY_RWLOCK_WRLOCK(api->lock);
-}
-void      MyAIAPI_Rdunlock      (MyAIAPI* api) {
-    MY_ASSERT_PTR(api);
-    MY_RWLOCK_RDUNLOCK(api->lock);
-}
-void      MyAIAPI_Wrunlock      (MyAIAPI* api) {
-    MY_ASSERT_PTR(api);
-    MY_RWLOCK_WRUNLOCK(api->lock);
 }
 
 void      MyAIAPI_ToolCreate    (MyAIAPITool* tool, const char* name, const char* description, MyAIAPIToolFn fn) {

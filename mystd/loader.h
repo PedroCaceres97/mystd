@@ -1,6 +1,7 @@
 #ifndef __MYSTD_LOADER_H__
 #define __MYSTD_LOADER_H__
 
+#include "stddef.h"
 #include <mystd/stdio.h>
 #include <mystd/string.h>
 
@@ -15,13 +16,16 @@ typedef enum {
 } MyLoaderMode;
 
 typedef struct MyLoaderFile {
-    bool allocated;
-    bool open;
-    char filepath[MY_LOADER_FILEPATH_SIZE];
-    MyLoaderMode mode;
-    size_t cursor;
-    MyString data;
+    MyStructHeader  header;
+
+    char            filepath[MY_LOADER_FILEPATH_SIZE];
+    MyString        data;
+    size_t          cursor;
+    MyLoaderMode    mode;
+    bool8           open;
 } MyLoaderFile;
+
+MY_RWLOCK_DECLARES(MyLoaderFile, file, MyLoader)
 
 MyLoaderFile*   MyLoader_Create         (MyLoaderFile* file, const char* filepath);
 void            MyLoader_Destroy        (MyLoaderFile* file);

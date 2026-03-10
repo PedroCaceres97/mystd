@@ -70,8 +70,13 @@ void MyLog_(MyLogLevel level, MyContext context, const char* msg) {
         }
     }
 
-    MyRawSnprintf(buffer, MY_LOG_BUFFER_SIZE, "%s\n Context: %s:%u (%s)\n Message: %s\n\n", title, context.file, context.line, context.func, msg);
+    MyRawSnprintf(buffer, MY_LOG_BUFFER_SIZE, 
+        "\n%s\n %s " 
+        MY_ANSI_COLOR(MY_ANSI_ITALIC MY_ANSI_FG_256(189), "%s:%u -> %s()") "\n %s " 
+        MY_ANSI_COLOR(MY_ANSI_FG_256(207), "%s") "\n\n", 
+        title, MY_LOG_CONTEXT_LABEL, context.file, context.line, context.func, MY_LOG_MESSAGE_LABEL, msg);
     MyFilePrint(file, buffer);
+    if (level == MY_FATAL) { MyExit(); }
 #endif /* MY_LOG_DISABLE_ALL */
 }
 

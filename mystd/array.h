@@ -1,4 +1,5 @@
 #include <mystd/stdlib.h>
+#include <mystd/stdio.h>
 
 #ifndef MY_ARRAY_NAME
     #define MY_ARRAY_NAME MyArrayInt
@@ -21,11 +22,6 @@
 
 #define MY_ARRAY_FN_CREATE      MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Create)
 #define MY_ARRAY_FN_DESTROY     MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Destroy)
-
-#define MY_ARRAY_FN_RDLOCK      MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Rdlock)
-#define MY_ARRAY_FN_WRLOCK      MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Wrlock)
-#define MY_ARRAY_FN_RDUNLOCK    MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Rdunlock)
-#define MY_ARRAY_FN_WRUNLOCK    MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Wrunlock)
 
 #define MY_ARRAY_FN_DATA        MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Data)
 #define MY_ARRAY_FN_SIZE        MY_CONCAT2(MY_ARRAY_FN_PREFIX, _Size)
@@ -55,13 +51,10 @@ extern "C" {
 struct MY_ARRAY_STRUCT;
 typedef struct MY_ARRAY_STRUCT MY_ARRAY_STRUCT;
 
+MY_RWLOCK_DECLARES(MY_ARRAY_STRUCT, array, MY_ARRAY_FN_PREFIX)
+
 MY_ARRAY_STRUCT*    MY_ARRAY_FN_CREATE      (MY_ARRAY_STRUCT* array);
 void                MY_ARRAY_FN_DESTROY     (MY_ARRAY_STRUCT* array);
-
-void                MY_ARRAY_FN_RDLOCK      (MY_ARRAY_STRUCT* array);
-void                MY_ARRAY_FN_WRLOCK      (MY_ARRAY_STRUCT* array);
-void                MY_ARRAY_FN_RDUNLOCK    (MY_ARRAY_STRUCT* array);
-void                MY_ARRAY_FN_WRUNLOCK    (MY_ARRAY_STRUCT* array);
 
 MY_ARRAY_DATA_TYPE* MY_ARRAY_FN_DATA        (MY_ARRAY_STRUCT* array);
 size_t              MY_ARRAY_FN_SIZE        (MY_ARRAY_STRUCT* array);
@@ -84,54 +77,30 @@ void                MY_ARRAY_FN_MEMCPY      (MY_ARRAY_STRUCT* array, size_t idx,
 void                MY_ARRAY_FN_MEMSET      (MY_ARRAY_STRUCT* array, size_t idx,       MY_ARRAY_DATA_TYPE value, size_t count);
 
 struct MY_ARRAY_STRUCT {
+    MyStructHeader      header;
+
     MY_ARRAY_DATA_TYPE  data[MY_ARRAY_SIZE];
     size_t              size;
-    bool                allocated;
-    MY_RWLOCK_TYPE      lock;
 };
 
 #ifdef MY_ARRAY_IMPLEMENTATION
 
+MY_RWLOCK_DEFINES(MY_ARRAY_STRUCT, array, MY_ARRAY_FN_PREFIX)
+
 MY_ARRAY_STRUCT*    MY_ARRAY_FN_CREATE      (MY_ARRAY_STRUCT* array) {
-    if (!array) {
-        MY_CALLOC(array, struct MY_ARRAY_STRUCT, 1);
-        array->allocated = true;
-    } else {
-        array->allocated = false;
-    }
-
+    MY_ADOPT_OR_ALLOC(array, MY_ARRAY_STRUCT);
     array->size = 0;
-    memset(array->data, 0, sizeof(array->data));
-    MY_RWLOCK_INIT(array->lock);
-
+    memset(array->data, 0, MY_ARRAY_SIZE);
     return array;
 }
 void                MY_ARRAY_FN_DESTROY     (MY_ARRAY_STRUCT* array) {
     MY_ASSERT_PTR(array);
-    MY_ASSERT(array->size == 0, "Destroying non empty array (HINT: Clear the array)");
-
-    MY_RWLOCK_DESTROY(array->lock);
-
-    if (array->allocated) {
-        MY_FREE(array);
+    if (array->size != 0) {
+        MyLog(MY_WARNING, "Destroying a non empty array (memory will be freed automatically)");
+        MY_ARRAY_FN_CLEAR(array);
     }
-}
 
-void                MY_ARRAY_FN_RDLOCK      (MY_ARRAY_STRUCT* array) {
-    MY_ASSERT_PTR(array);
-    MY_RWLOCK_RDLOCK(array->lock);
-}
-void                MY_ARRAY_FN_WRLOCK      (MY_ARRAY_STRUCT* array) {
-    MY_ASSERT_PTR(array);
-    MY_RWLOCK_WRLOCK(array->lock);
-}
-void                MY_ARRAY_FN_RDUNLOCK    (MY_ARRAY_STRUCT* array) {
-    MY_ASSERT_PTR(array);
-    MY_RWLOCK_RDUNLOCK(array->lock);
-}
-void                MY_ARRAY_FN_WRUNLOCK    (MY_ARRAY_STRUCT* array) {
-    MY_ASSERT_PTR(array);
-    MY_RWLOCK_WRUNLOCK(array->lock);
+    MY_FREE_ADOPTED(array);
 }
 
 MY_ARRAY_DATA_TYPE* MY_ARRAY_FN_DATA        (MY_ARRAY_STRUCT* array) {
@@ -273,11 +242,6 @@ void                MY_ARRAY_FN_MEMSET      (MY_ARRAY_STRUCT* array, size_t idx,
 
 #undef MY_ARRAY_FN_CREATE    
 #undef MY_ARRAY_FN_DESTROY
-
-#undef MY_ARRAY_FN_RDLOCK    
-#undef MY_ARRAY_FN_WRLOCK    
-#undef MY_ARRAY_FN_RDUNLOCK  
-#undef MY_ARRAY_FN_WRUNLOCK
 
 #undef MY_ARRAY_FN_DATA      
 #undef MY_ARRAY_FN_SIZE      

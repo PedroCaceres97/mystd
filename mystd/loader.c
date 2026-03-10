@@ -1,16 +1,13 @@
-#include "loader.h"
+#include "mystd/stddef.h"
 #include <mystd/loader.h>
+
+MY_RWLOCK_DEFINES(MyLoaderFile, file, MyLoader)
 
 MyLoaderFile* MyLoader_Create(MyLoaderFile* file, const char* filepath) {
     size_t len = strlen(filepath);
     MY_ASSERT(len < MY_LOADER_FILEPATH_SIZE, MySprintf("Filepath lenght (%zu) exceeds MY_LOADER_FILEPATH_SIZE (%zu)", len, MY_LOADER_FILEPATH_SIZE));
     
-    if (!file) {
-        MY_CALLOC(file, MyLoaderFile, 1);
-        file->allocated = true;
-    } else {
-        file->allocated = false;
-    }
+    MY_ADOPT_OR_ALLOC(file, MyLoaderFile);
 
     file->open = false;
     file->mode = MY_LOADER_NULL;
@@ -25,9 +22,7 @@ void MyLoader_Destroy(MyLoaderFile* file) {
     MyLoader_Close(file);
     MyString_Clear(&file->data);
     MyString_Destroy(&file->data);
-    if (file->allocated) {
-        MY_FREE(file);
-    }
+    MY_FREE_ADOPTED(file);
 }
 
 void MyLoader_Open(MyLoaderFile* file, MyLoaderMode mode) {

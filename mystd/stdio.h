@@ -16,50 +16,61 @@
 
 #ifdef MY_LOG_COLOURED
     #ifndef MY_LOG_COLOR
-        #define MY_LOG_COLOR(msg)      MY_ANSI_COLOR(MY_ANSI_FG_256(212), msg)
-    #endif
+        #define MY_LOG_COLOR(msg)       MY_ANSI_COLOR(MY_ANSI_FG_256(212), msg)
+    #endif /* MY_LOG_COLOR */
     #ifndef MY_DEBUG_COLOR
-        #define MY_DEBUG_COLOR(msg)    MY_ANSI_COLOR(MY_ANSI_FG_256(87),  msg)
-    #endif
+        #define MY_DEBUG_COLOR(msg)     MY_ANSI_COLOR(MY_ANSI_FG_256(87),  msg)
+    #endif /* MY_DEBUG_COLOR */
     #ifndef MY_SUCCESS_COLOR
-        #define MY_SUCCESS_COLOR(msg)  MY_ANSI_COLOR(MY_ANSI_FG_256(46),  msg)
-    #endif
+        #define MY_SUCCESS_COLOR(msg)   MY_ANSI_COLOR(MY_ANSI_FG_256(46),  msg)
+    #endif /* MY_SUCCESS_COLOR */
     #ifndef MY_WARNING_COLOR
-        #define MY_WARNING_COLOR(msg)  MY_ANSI_COLOR(MY_ANSI_FG_256(214), msg)
-    #endif
+        #define MY_WARNING_COLOR(msg)   MY_ANSI_COLOR(MY_ANSI_FG_256(214), msg)
+    #endif /* MY_WARNING_COLOR */
     #ifndef MY_ERROR_COLOR
-        #define MY_ERROR_COLOR(msg)    MY_ANSI_COLOR(MY_ANSI_FG_256(196), msg)
-    #endif
+        #define MY_ERROR_COLOR(msg)     MY_ANSI_COLOR(MY_ANSI_FG_256(196), msg)
+    #endif /* MY_ERROR_COLOR */
     #ifndef MY_FATAL_COLOR
-        #define MY_FATAL_COLOR(msg)    MY_ANSI_COLOR(MY_ANSI_FG_256(165), msg)
-    #endif
+        #define MY_FATAL_COLOR(msg)     MY_ANSI_COLOR(MY_ANSI_FG_256(165), msg)
+    #endif /* MY_FATAL_COLOR */
+    #ifndef MY_LOG_LABEL_COLOR
+        #define MY_LOG_LABEL_COLOR(msg) MY_ANSI_COLOR(MY_ANSI_FG_256(244), msg)
+    #endif /* MY_LOG_LABEL_COLOR */
 #else
-    #define MY_LOG_COLOR(msg)      msg
-    #define MY_DEBUG_COLOR(msg)    msg
-    #define MY_SUCCESS_COLOR(msg)  msg
-    #define MY_WARNING_COLOR(msg)  msg
-    #define MY_ERROR_COLOR(msg)    msg
-    #define MY_FATAL_COLOR(msg)    msg
+    #define MY_LOG_COLOR(msg)           msg
+    #define MY_DEBUG_COLOR(msg)         msg
+    #define MY_SUCCESS_COLOR(msg)       msg
+    #define MY_WARNING_COLOR(msg)       msg
+    #define MY_ERROR_COLOR(msg)         msg
+    #define MY_FATAL_COLOR(msg)         msg
+    #define MY_LOG_LABEL_COLOR(msg)     msg
 #endif
 
 #ifndef MY_LOG_TITLE
-    #define MY_LOG_TITLE        MY_LOG_COLOR("[LOG]")
+    #define MY_LOG_TITLE            MY_LOG_COLOR("[LOG / INFO]")
 #endif /* MY_LOG_TITLE */
 #ifndef MY_DEBUG_TITLE
-    #define MY_DEBUG_TITLE      MY_DEBUG_COLOR("[DEBUG]")
+    #define MY_DEBUG_TITLE          MY_DEBUG_COLOR("[DEBUG]")
 #endif /* MY_DEBUG_TITLE */
 #ifndef MY_SUCCESS_TITLE
-    #define MY_SUCCESS_TITLE    MY_SUCCESS_COLOR("[SUCCESS]")
+    #define MY_SUCCESS_TITLE        MY_SUCCESS_COLOR("[SUCCESS]")
 #endif /* MY_SUCCESS_TITLE */
 #ifndef MY_WARNING_TITLE
-    #define MY_WARNING_TITLE    MY_WARNING_COLOR("[WARNING]")
+    #define MY_WARNING_TITLE        MY_WARNING_COLOR("[WARNING]")
 #endif /* MY_WARNING_TITLE */
 #ifndef MY_ERROR_TITLE
-    #define MY_ERROR_TITLE      MY_ERROR_COLOR("[ERROR]")
+    #define MY_ERROR_TITLE          MY_ERROR_COLOR("[ERROR]")
 #endif /* MY_ERROR_TITLE */
 #ifndef MY_FATAL_TITLE 
-    #define MY_FATAL_TITLE      MY_FATAL_COLOR("[FATAL]")
+    #define MY_FATAL_TITLE          MY_FATAL_COLOR("[FATAL]")
 #endif /* MY_FATAL_TITLE */
+
+#ifndef MY_LOG_CONTEXT_LABEL
+    #define MY_LOG_CONTEXT_LABEL    MY_LOG_LABEL_COLOR("Context:")
+#endif /* MY_LOG_CONTEXT_LABEL */
+#ifndef MY_LOG_MESSAGE_LABEL
+    #define MY_LOG_MESSAGE_LABEL    MY_LOG_LABEL_COLOR("Message:")
+#endif /* MY_LOG_MESSAGE_LABEL */
 
 #ifndef MY_LOG_BUFFERS
     #define MY_LOG_BUFFERS 4

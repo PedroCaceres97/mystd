@@ -1,20 +1,17 @@
+#include "mystd/stddef.h"
 #include <mystd/string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+MY_RWLOCK_DEFINES(MyString, str, MyString)
+
 MyString*   MyString_Create     (MyString* str) {
-    if (!str) {
-        MY_CALLOC(str, MyString, 1);
-        str->allocated = true;
-    } else {
-        str->allocated = false;
-    }
+    MY_ADOPT_OR_ALLOC(str, MyString);
 
     str->size = 0;
     str->capacity = MY_STRING_INITIAL_SIZE;
-    MY_RWLOCK_INIT(str->lock);
     MY_CALLOC(str->data, char, str->capacity + 1);
 
     return str;
@@ -22,29 +19,8 @@ MyString*   MyString_Create     (MyString* str) {
 void        MyString_Destroy    (MyString* str) {
     MY_ASSERT_PTR(str);
 
-    MY_RWLOCK_DESTROY(str->lock);
     MY_FREE(str->data);
-
-    if (str->allocated) {
-        MY_FREE(str);
-    }
-}
-
-void        MyString_Rdlock     (MyString* str) {
-    MY_ASSERT_PTR(str);
-    MY_RWLOCK_RDLOCK(str->lock);
-}
-void        MyString_Wrlock     (MyString* str) {
-    MY_ASSERT_PTR(str);
-    MY_RWLOCK_WRLOCK(str->lock);
-}
-void        MyString_Rdunlock   (MyString* str) {
-    MY_ASSERT_PTR(str);
-    MY_RWLOCK_RDUNLOCK(str->lock);
-}
-void        MyString_Wrunlock   (MyString* str) {
-    MY_ASSERT_PTR(str);
-    MY_RWLOCK_WRUNLOCK(str->lock);
+    MY_FREE_ADOPTED(str);
 }
 
 char*       MyString_Cstr       (MyString* str) {

@@ -1,4 +1,6 @@
+#include "mystd/stddef.h"
 #include <mystd/stdlib.h>
+#include <mystd/stdio.h>
 
 #ifndef MY_LIST_NAME
   #define MY_LIST_NAME MyListInt
@@ -18,11 +20,6 @@
 
 #define MY_LIST_FN_CREATE           MY_CONCAT2(MY_LIST_FN_PREFIX, _Create)
 #define MY_LIST_FN_DESTROY          MY_CONCAT2(MY_LIST_FN_PREFIX, _Destroy)
-
-#define MY_LIST_FN_RDLOCK           MY_CONCAT2(MY_LIST_FN_PREFIX, _Rdlock)
-#define MY_LIST_FN_WRLOCK           MY_CONCAT2(MY_LIST_FN_PREFIX, _Wrlock)
-#define MY_LIST_FN_RDUNLOCK         MY_CONCAT2(MY_LIST_FN_PREFIX, _Rdunlock)
-#define MY_LIST_FN_WRUNLOCK         MY_CONCAT2(MY_LIST_FN_PREFIX, _Wrunlock)
 
 #define MY_LIST_FN_GET              MY_CONCAT2(MY_LIST_FN_PREFIX, _Get)
 #define MY_LIST_FN_SIZE             MY_CONCAT2(MY_LIST_FN_PREFIX, _Size)
@@ -60,13 +57,10 @@ struct MY_LIST_STRUCT;
 typedef struct MY_LIST_NODE_STRUCT MY_LIST_NODE_STRUCT;
 typedef struct MY_LIST_STRUCT MY_LIST_STRUCT;
 
+MY_RWLOCK_DECLARES(MY_LIST_FN_PREFIX, list, MY_LIST_STRUCT)
+
 MY_LIST_STRUCT*         MY_LIST_FN_CREATE           (MY_LIST_STRUCT* list);
 void                    MY_LIST_FN_DESTROY          (MY_LIST_STRUCT* list);
-
-void                    MY_LIST_FN_RDLOCK           (MY_LIST_STRUCT* list);
-void                    MY_LIST_FN_WRLOCK           (MY_LIST_STRUCT* list);
-void                    MY_LIST_FN_RDUNLOCK         (MY_LIST_STRUCT* list);
-void                    MY_LIST_FN_WRUNLOCK         (MY_LIST_STRUCT* list);
 
 MY_LIST_NODE_STRUCT*    MY_LIST_FN_GET              (MY_LIST_STRUCT* list, size_t index);
 size_t                  MY_LIST_FN_SIZE             (MY_LIST_STRUCT* list);
@@ -94,64 +88,40 @@ MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_PREV        (MY_LIST_NODE_STRUCT* node);
 MY_LIST_STRUCT*         MY_LIST_NODE_FN_LIST        (MY_LIST_NODE_STRUCT* node);
 
 struct MY_LIST_NODE_STRUCT {
-    MY_LIST_DATA_TYPE       data;
     MY_LIST_NODE_STRUCT*    next;
     MY_LIST_NODE_STRUCT*    prev;
     MY_LIST_STRUCT*         list;
-    bool                    allocated;
+    MY_LIST_DATA_TYPE       data;
+    bool8                   allocated;
 };
 
 struct MY_LIST_STRUCT {
-    size_t                  size;
+    MyStructHeader          header;
+
     MY_LIST_NODE_STRUCT*    front;
     MY_LIST_NODE_STRUCT*    back;
-    bool                    allocated;
-    MY_RWLOCK_TYPE          lock;
+    size_t                  size;
 };
 
 #ifdef MY_LIST_IMPLEMENTATION
 
-MY_LIST_STRUCT*         MY_LIST_FN_CREATE           (MY_LIST_STRUCT* list) {
-    if (!list) {
-        MY_CALLOC(list, MY_LIST_STRUCT, 1);
-        list->allocated = true;
-    } else {
-        list->allocated = false;
-    }
+MY_RWLOCK_DEFINES(MY_LIST_FN_PREFIX, list, MY_LIST_STRUCT)
 
+MY_LIST_STRUCT*         MY_LIST_FN_CREATE           (MY_LIST_STRUCT* list) {
+    MY_ADOPT_OR_ALLOC(list, MY_LIST_STRUCT);
     list->size = 0;
     list->front = NULL;
     list->back = NULL;
-    MY_RWLOCK_INIT(list->lock);
-
     return list;
 }
 void                    MY_LIST_FN_DESTROY          (MY_LIST_STRUCT* list) {
     MY_ASSERT_PTR(list);
-    MY_ASSERT(list->size == 0, "Destroying non-empty list (HINT: Clear the list)");
-
-    MY_RWLOCK_DESTROY(list->lock);
-
-    if (list->allocated) {
-        MY_FREE(list);
+    if (list->size != 0) {
+        MyLog(MY_WARNING, "Destroying a non empty list (memory will be freed automatically)");
+        MY_LIST_FN_CLEAR(list, true);
     }
-}
 
-void                    MY_LIST_FN_RDLOCK           (MY_LIST_STRUCT* list) {
-    MY_ASSERT_PTR(list);
-    MY_RWLOCK_RDLOCK(list->lock);
-}
-void                    MY_LIST_FN_WRLOCK           (MY_LIST_STRUCT* list) {
-    MY_ASSERT_PTR(list);
-    MY_RWLOCK_WRLOCK(list->lock);
-}
-void                    MY_LIST_FN_RDUNLOCK         (MY_LIST_STRUCT* list) {
-    MY_ASSERT_PTR(list);
-    MY_RWLOCK_RDUNLOCK(list->lock);
-}
-void                    MY_LIST_FN_WRUNLOCK         (MY_LIST_STRUCT* list) {
-    MY_ASSERT_PTR(list);
-    MY_RWLOCK_WRUNLOCK(list->lock);
+    MY_FREE_ADOPTED(list);
 }
 
 MY_LIST_NODE_STRUCT*    MY_LIST_FN_GET              (MY_LIST_STRUCT* list, size_t idx) {
@@ -327,7 +297,6 @@ MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_CREATE      (MY_LIST_NODE_STRUCT* node) 
     node->next = NULL;
     node->prev = NULL;
     node->list = NULL;
-
     return node;
 }
 MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_DUPLICATE   (MY_LIST_NODE_STRUCT* src, MY_LIST_NODE_STRUCT* dst) {
@@ -335,7 +304,6 @@ MY_LIST_NODE_STRUCT*    MY_LIST_NODE_FN_DUPLICATE   (MY_LIST_NODE_STRUCT* src, M
 
     dst = MY_LIST_NODE_FN_CREATE(dst);
     dst->data = src->data;
-
     return dst;
 }
 void                    MY_LIST_NODE_FN_DESTROY     (MY_LIST_NODE_STRUCT* node) {
@@ -383,11 +351,6 @@ MY_LIST_STRUCT*         MY_LIST_NODE_FN_LIST        (MY_LIST_NODE_STRUCT* node) 
 
 #undef MY_LIST_FN_CREATE
 #undef MY_LIST_FN_DESTROY
-
-#undef MY_LIST_FN_RDLOCK
-#undef MY_LIST_FN_WRLOCK
-#undef MY_LIST_FN_RDUNLOCK
-#undef MY_LIST_FN_WRUNLOCK
 
 #undef MY_LIST_FN_GET
 #undef MY_LIST_FN_SIZE

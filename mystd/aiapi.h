@@ -1,6 +1,7 @@
 #ifndef __MYSTD_AIAPI_H__
 #define __MYSTD_AIAPI_H__
 
+#include "stddef.h"
 #include <mystd/stdio.h>
 #include <mystd/stdlib.h>
 
@@ -38,14 +39,11 @@ typedef struct MyAIAPIBackendOps MyAIAPIBackendOps;
  */
 typedef cJSON* (*MyAIAPIToolFn)(cJSON* args);
 
+MY_RWLOCK_DECLARES(MyAIAPI, api, MyAIAPI)
+
 MyAIAPI*    MyAIAPI_Create          (MyAIAPI* api, MyAIAPIConfig config);
 void        MyAIAPI_Destroy         (MyAIAPI* api);
 cJSON*      MyAIAPI_Send            (MyAIAPI* api, cJSON* message);
-
-void        MyAIAPI_Rdlock          (MyAIAPI* api);
-void        MyAIAPI_Wrlock          (MyAIAPI* api);
-void        MyAIAPI_Rdunlock        (MyAIAPI* api);
-void        MyAIAPI_Wrunlock        (MyAIAPI* api);
 
 void        MyAIAPI_ToolCreate      (MyAIAPITool* tool, const char* name, const char* description, MyAIAPIToolFn fn);
 void        MyAIAPI_ToolAddParam    (MyAIAPITool* tool, const char* name, const char* type);
@@ -99,6 +97,8 @@ struct MyAIAPITool {
 };
 
 struct MyAIAPI {
+    MyStructHeader              header;
+
     cJSON*                      root;
     cJSON*                      tools;
     cJSON*                      messages;
@@ -112,9 +112,6 @@ struct MyAIAPI {
     MyAIAPITool                 attached[MY_AIAPI_TOOL_COUNT];
     MyAIAPIConfig               config;
     const MyAIAPIBackendOps*    backend;
-
-    bool                        allocated;
-    MY_RWLOCK_TYPE              lock;
 };
 
 #ifdef __cplusplus

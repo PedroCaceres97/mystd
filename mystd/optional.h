@@ -1,3 +1,4 @@
+#include "stddef.h"
 #include <mystd/stdlib.h>
 
 #ifndef MY_OPTIONAL_NAME
@@ -18,11 +19,6 @@
 #define MY_OPTIONAL_FN_CREATE       MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Create)
 #define MY_OPTIONAL_FN_DESTROY      MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Destroy)
 
-#define MY_OPTIONAL_FN_RDLOCK       MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Rdlock)
-#define MY_OPTIONAL_FN_WRLOCK       MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Wrlock)
-#define MY_OPTIONAL_FN_RDUNLOCK     MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Rdunlock)
-#define MY_OPTIONAL_FN_WRUNLOCK     MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Wrunlock)
-
 #define MY_OPTIONAL_FN_SET          MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Set)
 #define MY_OPTIONAL_FN_GET          MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Get)
 #define MY_OPTIONAL_FN_RESET        MY_CONCAT2(MY_OPTIONAL_FN_PREFIX, _Reset)
@@ -36,13 +32,10 @@ extern "C" {
 struct MY_OPTIONAL_STRUCT;
 typedef struct MY_OPTIONAL_STRUCT MY_OPTIONAL_STRUCT;
 
+MY_RWLOCK_DECLARES(MY_OPTIONAL_STRUCT, optional, MY_OPTIONAL_FN_PREFIX)
+
 MY_OPTIONAL_STRUCT*     MY_OPTIONAL_FN_CREATE       (MY_OPTIONAL_STRUCT* optional);
 void                    MY_OPTIONAL_FN_DESTROY      (MY_OPTIONAL_STRUCT* optional);
-
-void                    MY_OPTIONAL_FN_RDLOCK       (MY_OPTIONAL_STRUCT* optional);
-void                    MY_OPTIONAL_FN_WRLOCK       (MY_OPTIONAL_STRUCT* optional);
-void                    MY_OPTIONAL_FN_RDUNLOCK     (MY_OPTIONAL_STRUCT* optional);
-void                    MY_OPTIONAL_FN_WRUNLOCK     (MY_OPTIONAL_STRUCT* optional);
 
 void                    MY_OPTIONAL_FN_SET          (MY_OPTIONAL_STRUCT* optional, MY_OPTIONAL_DATA_TYPE value);
 MY_OPTIONAL_DATA_TYPE   MY_OPTIONAL_FN_GET          (MY_OPTIONAL_STRUCT* optional);
@@ -50,53 +43,25 @@ void                    MY_OPTIONAL_FN_RESET        (MY_OPTIONAL_STRUCT* optiona
 bool                    MY_OPTIONAL_FN_HAS_VALUE    (MY_OPTIONAL_STRUCT* optional);
 
 struct MY_OPTIONAL_STRUCT {
+    MyStructHeader          header;
+
     MY_OPTIONAL_DATA_TYPE   data;
-    bool                    has;
-    bool                    allocated;
-    MY_RWLOCK_TYPE          lock;
+    bool8                   has;
 };
 
 #ifdef MY_OPTIONAL_IMPLEMENTATION
 
-MY_OPTIONAL_STRUCT*     MY_OPTIONAL_FN_CREATE       (MY_OPTIONAL_STRUCT* optional) {
-    if (!optional) {
-        MY_CALLOC(optional, struct MY_OPTIONAL_STRUCT, 1);
-        optional->allocated = true;
-    } else {
-        optional->allocated = false;
-    }
+MY_RWLOCK_DEFINES(MY_OPTIONAL_STRUCT, optional, MY_OPTIONAL_FN_PREFIX)
 
+MY_OPTIONAL_STRUCT*     MY_OPTIONAL_FN_CREATE       (MY_OPTIONAL_STRUCT* optional) {
+    MY_ADOPT_OR_ALLOC(optional, MY_OPTIONAL_STRUCT);
     optional->has = false;
     memset(&optional->data, 0, sizeof(optional->data));
-    MY_RWLOCK_INIT(optional->lock);
-
     return optional;
 }
 void                    MY_OPTIONAL_FN_DESTROY      (MY_OPTIONAL_STRUCT* optional) {
     MY_ASSERT_PTR(optional);
-
-    MY_RWLOCK_DESTROY(optional->lock);
-
-    if (optional->allocated) {
-        MY_FREE(optional);
-    }
-}
-
-void                    MY_OPTIONAL_FN_RDLOCK       (MY_OPTIONAL_STRUCT* optional) {
-    MY_ASSERT_PTR(optional);
-    MY_RWLOCK_RDLOCK(optional->lock);
-}
-void                    MY_OPTIONAL_FN_WRLOCK       (MY_OPTIONAL_STRUCT* optional) {
-    MY_ASSERT_PTR(optional);
-    MY_RWLOCK_WRLOCK(optional->lock);
-}
-void                    MY_OPTIONAL_FN_RDUNLOCK     (MY_OPTIONAL_STRUCT* optional) {
-    MY_ASSERT_PTR(optional);
-    MY_RWLOCK_RDUNLOCK(optional->lock);
-}
-void                    MY_OPTIONAL_FN_WRUNLOCK     (MY_OPTIONAL_STRUCT* optional) {
-    MY_ASSERT_PTR(optional);
-    MY_RWLOCK_WRUNLOCK(optional->lock);
+    MY_FREE_ADOPTED(optional);
 }
 
 void                    MY_OPTIONAL_FN_SET          (MY_OPTIONAL_STRUCT* optional, MY_OPTIONAL_DATA_TYPE value) {
@@ -135,11 +100,6 @@ bool                    MY_OPTIONAL_FN_HAS_VALUE    (MY_OPTIONAL_STRUCT* optiona
 
 #undef MY_OPTIONAL_FN_CREATE    
 #undef MY_OPTIONAL_FN_DESTROY
-
-#undef MY_OPTIONAL_FN_RDLOCK    
-#undef MY_OPTIONAL_FN_WRLOCK    
-#undef MY_OPTIONAL_FN_RDUNLOCK  
-#undef MY_OPTIONAL_FN_WRUNLOCK
 
 #undef MY_OPTIONAL_FN_SET
 #undef MY_OPTIONAL_FN_GET

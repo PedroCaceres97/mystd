@@ -1,6 +1,7 @@
 #ifndef __MYSTD_STRING_H__
 #define __MYSTD_STRING_H__
 
+#include "stddef.h"
 #include <mystd/stdio.h>
 
 #ifndef MY_STRING_RESIZE_POLICIE
@@ -22,13 +23,10 @@ extern "C" {
 struct MyString;
 typedef struct MyString MyString;
 
+MY_RWLOCK_DECLARES(MyString, str, MyString)
+
 MyString*   MyString_Create     (MyString* str);
 void        MyString_Destroy    (MyString* str);
-
-void        MyString_Rdlock     (MyString* str);
-void        MyString_Wrlock     (MyString* str);
-void        MyString_Rdunlock   (MyString* str);
-void        MyString_Wrunlock   (MyString* str);
 
 char*       MyString_Cstr       (MyString* str);
 size_t      MyString_Size       (MyString* str);
@@ -50,11 +48,11 @@ void        MyString_PushFront  (MyString* str, char c);
 void        MyString_Memcpy     (MyString* str, size_t idx, const void* src, size_t count);
 
 struct MyString {
-    char*             data;
-    size_t            size;
-    size_t            capacity;
-    int               allocated;
-    MY_RWLOCK_TYPE    lock;
+    MyStructHeader  header;
+
+    char*           data;
+    size_t          size;
+    size_t          capacity;
 };
 
 #ifdef __cplusplus

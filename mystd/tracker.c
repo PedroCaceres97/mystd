@@ -1,3 +1,4 @@
+#include "mystd/stddef.h"
 #include <mystd/tracker.h>
 
 #define MY_TRACKER_PTR_TO_HDR(ptr) ((MyTrackerPtrhdr*)  MY_PTR_SUB(ptr, sizeof(struct MyTrackerPtrhdr)))
@@ -38,15 +39,17 @@ static void MyTrackerList_Erase(MyTrackerList* list, MyTrackerNode* node) {
     list->size--;
 }
 
+MY_RWLOCK_DEFINES(MyTracker, tracker, MyTracker)
+
 MyTracker*  MyTracker_Create(MyTracker* tracker, MyContext context) {
     if (!tracker) {
-        MY_CALLOC(tracker, struct MyTracker, 1);
-        tracker->allocated = true;
+        MY_TRACKER_CALLOC(tracker, struct MyTracker, 1);
+        tracker->header.allocated = true;
     } else {
-        tracker->allocated = false;
+        tracker->header.allocated = false;
     }
 
-    MY_RWLOCK_INIT(tracker->lock);
+    MY_RWLOCK_INIT(tracker->header.lock);
 
     tracker->bytes   = 0;
     tracker->context = context;
@@ -58,28 +61,13 @@ MyTracker*  MyTracker_Create(MyTracker* tracker, MyContext context) {
 }
 void        MyTracker_Destroy(MyTracker* tracker) {
     MY_ASSERT_PTR(tracker);
-    MY_ASSERT(tracker->ptrs.size == 0, "Destroying non empty tracker (HINT: Call free all)");
 
-    if (tracker->allocated) {
-        MY_TRACKER_FREE(tracker);
+    if (tracker->bytes != 0) {
+        MyLog(MY_WARNING, "Destroying a non empty tracker (memory will be freed automatically)");
+        MyTracker_Clear(tracker);
     }
-}
 
-void        MyTracker_Rdlock(MyTracker* tracker) {
-    MY_ASSERT_PTR(tracker);
-    MY_RWLOCK_RDLOCK(tracker->lock);
-}
-void        MyTracker_Wrlock(MyTracker* tracker) {
-    MY_ASSERT_PTR(tracker);
-    MY_RWLOCK_WRLOCK(tracker->lock);
-}
-void        MyTracker_Rdunlock(MyTracker* tracker) {
-    MY_ASSERT_PTR(tracker);
-    MY_RWLOCK_RDUNLOCK(tracker->lock);
-}
-void        MyTracker_Wrunlock(MyTracker* tracker) {
-    MY_ASSERT_PTR(tracker);
-    MY_RWLOCK_WRUNLOCK(tracker->lock);
+    MY_FREE_ADOPTED(tracker);
 }
 
 void        MyTracker_Clear(MyTracker* tracker) {

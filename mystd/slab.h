@@ -1,3 +1,4 @@
+#include "mystd/stddef.h"
 #include <mystd/stdio.h>
 
 #ifndef MY_SLAB_NAME
@@ -26,11 +27,6 @@
 #define MY_SLAB_FN_CREATE           MY_CONCAT2(MY_SLAB_FN_PREFIX, _Create)
 #define MY_SLAB_FN_DESTROY          MY_CONCAT2(MY_SLAB_FN_PREFIX, _Destroy)
 
-#define MY_SLAB_FN_RDLOCK           MY_CONCAT2(MY_SLAB_FN_PREFIX, _Rdlock)
-#define MY_SLAB_FN_WRLOCK           MY_CONCAT2(MY_SLAB_FN_PREFIX, _Wrlock)
-#define MY_SLAB_FN_RDUNLOCK         MY_CONCAT2(MY_SLAB_FN_PREFIX, _Rdunlock)
-#define MY_SLAB_FN_WRUNLOCK         MY_CONCAT2(MY_SLAB_FN_PREFIX, _Wrunlock)
-
 #define MY_SLAB_FN_CLEAR            MY_CONCAT2(MY_SLAB_FN_PREFIX, _Clear)
 #define MY_SLAB_FN_FREE             MY_CONCAT2(MY_SLAB_FN_PREFIX, _Free)
 #define MY_SLAB_FN_ALLOC            MY_CONCAT2(MY_SLAB_FN_PREFIX, _Alloc)
@@ -51,16 +47,13 @@ struct MY_SLAB_BLOCK_STRUCT;
 typedef struct MY_SLAB_STRUCT MY_SLAB_STRUCT;
 typedef struct MY_SLAB_BLOCK_STRUCT MY_SLAB_BLOCK_STRUCT;
 
+MY_RWLOCK_DEFINES(MY_SLAB_STRUCT, slab, MY_SLAB_FN_PREFIX)
+
 MY_SLAB_BLOCK_STRUCT* MY_SLAB_FN_CREATE_BLOCK   (MY_SLAB_BLOCK_STRUCT* block);
 void                  MY_SLAB_FN_DESTROY_BLOCK  (MY_SLAB_BLOCK_STRUCT* block);
 
 MY_SLAB_STRUCT*       MY_SLAB_FN_CREATE         (MY_SLAB_STRUCT* slab);
 void                  MY_SLAB_FN_DESTROY        (MY_SLAB_STRUCT* slab);
-
-void                  MY_SLAB_FN_RDLOCK         (MY_SLAB_STRUCT* slab);
-void                  MY_SLAB_FN_WRLOCK         (MY_SLAB_STRUCT* slab);
-void                  MY_SLAB_FN_RDUNLOCK       (MY_SLAB_STRUCT* slab);
-void                  MY_SLAB_FN_WRUNLOCK       (MY_SLAB_STRUCT* slab);
 
 void                  MY_SLAB_FN_CLEAR          (MY_SLAB_STRUCT* slab);
 void                  MY_SLAB_FN_FREE           (MY_SLAB_STRUCT* slab, MY_SLAB_DATA_TYPE* ptr);
@@ -73,21 +66,23 @@ void                  MY_SLAB_FN_DUMP           (MY_SLAB_STRUCT* slab, MyFile* f
 
 struct MY_SLAB_BLOCK_STRUCT {
     MY_SLAB_DATA_TYPE               mem[MY_SLAB_OBJECTS_COUNT];
-    bool                            allocated_table[MY_SLAB_OBJECTS_COUNT];
-    size_t                          free_count;
     MY_SLAB_DATA_TYPE*              free_stack[MY_SLAB_OBJECTS_COUNT];
+    bool8                           allocated_table[MY_SLAB_OBJECTS_COUNT];
     struct MY_SLAB_BLOCK_STRUCT*    next;
-    bool                            allocated;
+    size_t                          free_count;
+    bool8                           allocated;
 };
 
 struct MY_SLAB_STRUCT {
-    MY_SLAB_BLOCK_STRUCT  block;
-    size_t                total;
-    bool                  allocated;
-    MY_RWLOCK_TYPE        lock;
+    MyStructHeader          header;
+    
+    MY_SLAB_BLOCK_STRUCT    block;
+    size_t                  total;
 };
 
 #ifdef MY_SLAB_IMPLEMENTATION
+
+MY_RWLOCK_DECLARES(MY_SLAB_STRUCT, slab, MY_SLAB_FN_PREFIX)
 
 MY_SLAB_BLOCK_STRUCT*   MY_SLAB_FN_CREATE_BLOCK     (MY_SLAB_BLOCK_STRUCT* block) {
     if (!block) {
@@ -113,21 +108,16 @@ void                    MY_SLAB_FN_DESTROY_BLOCK    (MY_SLAB_BLOCK_STRUCT* block
 }
 
 MY_SLAB_STRUCT*         MY_SLAB_FN_CREATE           (MY_SLAB_STRUCT* slab) {
-    if (!slab) {
-        MY_CALLOC(slab, MY_SLAB_STRUCT, 1);
-        slab->allocated = true;
-    } else {
-        slab->allocated = false;
-    }
-
-    MY_RWLOCK_INIT(slab->lock);
+    MY_ADOPT_OR_ALLOC(slab, MY_SLAB_STRUCT);
     MY_SLAB_FN_CREATE_BLOCK(&slab->block);
-
     return slab;
 }
 void                    MY_SLAB_FN_DESTROY          (MY_SLAB_STRUCT* slab) {
     MY_ASSERT_PTR(slab);
-    MY_ASSERT(slab->total == 0, "Trying to free a non-empty slab");
+    if (slab->total != 0) {
+        MyLog(MY_WARNING, "Destroying a non empty slab (memory will be freed automatically)");
+        MY_SLAB_FN_CLEAR(slab);
+    }
 
     MY_SLAB_BLOCK_STRUCT* current = &slab->block;
     while (current) {
@@ -135,23 +125,7 @@ void                    MY_SLAB_FN_DESTROY          (MY_SLAB_STRUCT* slab) {
         MY_SLAB_FN_DESTROY_BLOCK(current);
         current = next;
     }
-}
-
-void                    MY_SLAB_FN_RDLOCK           (MY_SLAB_STRUCT* slab) {
-    MY_ASSERT_PTR(slab);
-    MY_RWLOCK_RDLOCK(slab->lock);
-}
-void                    MY_SLAB_FN_WRLOCK           (MY_SLAB_STRUCT* slab) {
-    MY_ASSERT_PTR(slab);
-    MY_RWLOCK_WRLOCK(slab->lock);
-}
-void                    MY_SLAB_FN_RDUNLOCK         (MY_SLAB_STRUCT* slab) {
-    MY_ASSERT_PTR(slab);
-    MY_RWLOCK_RDUNLOCK(slab->lock);
-}
-void                    MY_SLAB_FN_WRUNLOCK         (MY_SLAB_STRUCT* slab) {
-    MY_ASSERT_PTR(slab);
-    MY_RWLOCK_WRUNLOCK(slab->lock);
+    MY_FREE_ADOPTED(slab);
 }
 
 void                    MY_SLAB_FN_CLEAR            (MY_SLAB_STRUCT* slab) {
@@ -265,11 +239,6 @@ void                    MY_SLAB_FN_DUMP             (MY_SLAB_STRUCT* slab, MyFil
 
 #undef MY_SLAB_FN_CREATE
 #undef MY_SLAB_FN_DESTROY
-
-#undef MY_SLAB_FN_RDLOCK
-#undef MY_SLAB_FN_WRLOCK
-#undef MY_SLAB_FN_RDUNLOCK
-#undef MY_SLAB_FN_WRUNLOCK
 
 #undef MY_SLAB_FN_CLEAR
 #undef MY_SLAB_FN_FREE

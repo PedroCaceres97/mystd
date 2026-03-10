@@ -22,12 +22,12 @@ MY_NORETURN void MyExit();
 void MyAssertLog(const char* msg, MyContext context);
 void MyAssertBoundsLog(size_t idx, size_t bounds, MyContext context);
 
-#define MY_ASSERT(cnd, msg)                      do { if (!(cnd))            { MyAssertLog(msg, MY_CONTEXT(NULL));                                                                  MyExit(); } } while(0)
-#define MY_ASSERT_PTR(ptr)                       do { if ((ptr) == NULL)     { MyAssertLog("'"#ptr "' is NULL", MY_CONTEXT(NULL));                                                  MyExit(); } } while(0)
-#define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyAssertBoundsLog(idx, bound, MY_CONTEXT(NULL));                                                     MyExit(); } } while(0)
-#define MY_ASSERT_MALLOC(ptr, type, size)        do { if (ptr == NULL)       { MyAssertLog("Malloc failed for "  #ptr " of type " #type " and size "  #size, MY_CONTEXT(NULL));     MyExit(); } } while(0)
-#define MY_ASSERT_CALLOC(ptr, type, count)       do { if (ptr == NULL)       { MyAssertLog("Calloc failed for "  #ptr " of type " #type " and count " #count, MY_CONTEXT(NULL));    MyExit(); } } while(0)
-#define MY_ASSERT_REALLOC(ptr, type, size)       do { if (ptr == NULL)       { MyAssertLog("Realloc failed for " #ptr " of type " #type " and size "  #size, MY_CONTEXT(NULL));     MyExit(); } } while(0)
+#define MY_ASSERT(cnd, msg)                      do { if (!(cnd))            { MyAssertLog(msg, MY_CONTEXT(NULL));                  MyExit(); } } while(0)
+#define MY_ASSERT_PTR(ptr)                       do { if ((ptr) == NULL)     { MyAssertLog("'"#ptr "' is NULL", MY_CONTEXT(NULL));  MyExit(); } } while(0)
+#define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyAssertBoundsLog(idx, bound, MY_CONTEXT(NULL));     MyExit(); } } while(0)
+#define MY_ASSERT_MALLOC(ptr, type, size)        do { if (ptr == NULL)       { char myTempAssertAllocationBuffer[1024] = {0}; MyRawSnprintf(myTempAssertAllocationBuffer, sizeof(myTempAssertAllocationBuffer), "Malloc failed for "  #ptr " of type " #type " and size %zu",  size); MyAssertLog(myTempAssertAllocationBuffer, MY_CONTEXT(NULL));  MyExit(); } } while(0)
+#define MY_ASSERT_CALLOC(ptr, type, count)       do { if (ptr == NULL)       { char myTempAssertAllocationBuffer[1024] = {0}; MyRawSnprintf(myTempAssertAllocationBuffer, sizeof(myTempAssertAllocationBuffer), "Calloc failed for "  #ptr " of type " #type " and count %zu", count); MyAssertLog(myTempAssertAllocationBuffer, MY_CONTEXT(NULL)); MyExit(); } } while(0)
+#define MY_ASSERT_REALLOC(ptr, type, size)       do { if (ptr == NULL)       { char myTempAssertAllocationBuffer[1024] = {0}; MyRawSnprintf(myTempAssertAllocationBuffer, sizeof(myTempAssertAllocationBuffer), "Realloc failed for " #ptr " of type " #type " and size %zu",  size); MyAssertLog(myTempAssertAllocationBuffer, MY_CONTEXT(NULL));  MyExit(); } } while(0)
 
 #ifndef MY_EMPTY_POPPING_ENABLE
     #define MY_EMPTY_POPPING() MY_ASSERT(false, "To enable empty popping and avoid this error define MY_EMPTY_POPPING_ENABLE")
@@ -175,11 +175,11 @@ void MyNormalizePath(char* path);
 #define MY_CONCAT2(a, b) MY_CONCAT2_IMPL(a, b)
 #define MY_CONCAT3(a, b, c) MY_CONCAT3_IMPL(a, b, c)
 
-#define MY_FREE(ptr)                   do { free((void*)(ptr)); (ptr) = NULL; } while(0)
-#define MY_FREE_IF(ptr)                do { if ((ptr)) { MY_FREE((ptr)); }  } while(0)
-#define MY_MALLOC(v, type, size)       do { (v) = (type*)malloc((size));                MY_ASSERT_MALLOC((v), type, (size)); memset(v, 0, (size)); } while(0)
-#define MY_CALLOC(v, type, count)      do { (v) = (type*)calloc((count), sizeof(type)); MY_ASSERT_CALLOC((v), type, (count));                      } while(0)
-#define MY_REALLOC(v, type, ptr, size) do { (v) = (type*)realloc((void*)(ptr), (size)); MY_ASSERT_REALLOC((v), type, (size));                      } while(0)
+#define MY_FREE(ptr)                        do { free((void*)(ptr)); (ptr) = NULL; } while(0)
+#define MY_FREE_IF(ptr)                     do { if ((ptr)) { MY_FREE((ptr)); }  } while(0)
+#define MY_MALLOC(v, type, size)            do { (v) = (type*)malloc((size));                MY_ASSERT_MALLOC((v), type, (size)); memset(v, 0, (size));                         } while(0)
+#define MY_CALLOC(v, type, count)           do { (v) = (type*)calloc((count), sizeof(type)); MY_ASSERT_CALLOC((v), type, (count));                                              } while(0)
+#define MY_REALLOC(v, type, ptr, size)      do { (v) = (type*)realloc((void*)(ptr), (size)); MY_ASSERT_REALLOC((v), type, (size));                                              } while(0)
 
 #define MY_CAST(type, tocast)   ((type)(tocast))
 #define MY_TERNARY(cnd, x, y)   ((cnd) ? (x) : (y))

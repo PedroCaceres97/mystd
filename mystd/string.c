@@ -8,7 +8,7 @@ extern "C" {
 MY_RWLOCK_DEFINES(MyString, str, MyString)
 
 MyString*   MyString_Create     (MyString* str) {
-    MY_ADOPT_OR_ALLOC(str, MyString);
+    MY_STRUCT_CREATE_RULE(str, MyString);
 
     str->size = 0;
     str->capacity = MY_STRING_INITIAL_SIZE;
@@ -20,7 +20,7 @@ void        MyString_Destroy    (MyString* str) {
     MY_ASSERT_PTR(str);
 
     MY_FREE(str->data);
-    MY_FREE_ADOPTED(str);
+    MY_STRUCT_DESTROY_RULE(str);
 }
 
 char*       MyString_Cstr       (MyString* str) {

@@ -157,8 +157,8 @@ typedef struct MyStructHeader {
 } MyStructHeader;
 
 /* Adopts user memory ((v)->header.allocated = false) or Heap allocate ((v)->header.allocated = true) */
-#define MY_ADOPT_OR_ALLOC(v, type)  do { if ((v) == NULL) { MY_CALLOC(v, type, 1); (v)->header.allocated = true; } else { (v)->header.allocated = false; } MY_RWLOCK_INIT((v)->header.lock);    } while(0)
-#define MY_FREE_ADOPTED(v)          do { MY_RWLOCK_DESTROY((v)->header.lock); if (!(v)->header.allocated) { MY_FREE((v)); } (v) = NULL;                                                         } while(0)
+#define MY_STRUCT_CREATE_RULE(v, type)  do { if ((v) == NULL) { MY_CALLOC(v, type, 1); (v)->header.allocated = true; } else { (v)->header.allocated = false; } MY_RWLOCK_INIT((v)->header.lock);    } while(0)
+#define MY_STRUCT_DESTROY_RULE(v)       do { MY_RWLOCK_DESTROY((v)->header.lock); if (!(v)->header.allocated) { MY_FREE((v)); } (v) = NULL;                                                         } while(0)
 #define MY_RWLOCK_DECLARES(vtype, vname, fnprefix) \
     void MY_CONCAT2(fnprefix, _Rdlock)   (vtype* vname); \
     void MY_CONCAT2(fnprefix, _Wrlock)   (vtype* vname); \

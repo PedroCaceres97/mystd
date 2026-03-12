@@ -5,13 +5,13 @@
 #include <mystd/stdio.h>
 
 #ifndef MY_TRACKER_FREE
-    #define MY_TRACKER_FREE(ptr)                   do { free((void*)(ptr)); (ptr) = NULL;                                                                       } while(0)
+    #define MY_TRACKER_FREE(ptr)                    do { free((void*)(ptr)); (ptr) = NULL;                                                                       } while(0)
 #endif /* MY_TRACKER_FREE */
 #ifndef MY_TRACKER_MALLOC
-    #define MY_TRACKER_MALLOC(v, type, size)       do { (v) = (type*)malloc((size));                MY_ASSERT_MALLOC((v), type, (size)); memset(v, 0, (size));  } while(0)
+    #define MY_TRACKER_MALLOC(v, type, size)        do { (v) = (type*)malloc((size));                MY_ASSERT_MALLOC((v), type, (size)); memset(v, 0, (size));  } while(0)
 #endif /* MY_TRACKER_MALLOC */
 #ifndef MY_TRACKER_CALLOC
-    #define MY_TRACKER_CALLOC(v, type, count)      do { (v) = (type*)calloc((count), sizeof(type)); MY_ASSERT_CALLOC((v), type, (count));                       } while(0)
+    #define MY_TRACKER_CALLOC(v, type, count)       do { (v) = (type*)calloc((count), sizeof(type)); MY_ASSERT_CALLOC((v), type, (count));                       } while(0)
 #endif /* MY_TRACKER_CALLOC */
 
 #ifdef __cplusplus

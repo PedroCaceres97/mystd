@@ -54,14 +54,14 @@ struct MY_OPTIONAL_STRUCT {
 MY_RWLOCK_DEFINES(MY_OPTIONAL_STRUCT, optional, MY_OPTIONAL_FN_PREFIX)
 
 MY_OPTIONAL_STRUCT*     MY_OPTIONAL_FN_CREATE       (MY_OPTIONAL_STRUCT* optional) {
-    MY_ADOPT_OR_ALLOC(optional, MY_OPTIONAL_STRUCT);
+    MY_STRUCT_CREATE_RULE(optional, MY_OPTIONAL_STRUCT);
     optional->has = false;
     memset(&optional->data, 0, sizeof(optional->data));
     return optional;
 }
 void                    MY_OPTIONAL_FN_DESTROY      (MY_OPTIONAL_STRUCT* optional) {
     MY_ASSERT_PTR(optional);
-    MY_FREE_ADOPTED(optional);
+    MY_STRUCT_DESTROY_RULE(optional);
 }
 
 void                    MY_OPTIONAL_FN_SET          (MY_OPTIONAL_STRUCT* optional, MY_OPTIONAL_DATA_TYPE value) {

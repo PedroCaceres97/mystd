@@ -108,7 +108,7 @@ void                    MY_SLAB_FN_DESTROY_BLOCK    (MY_SLAB_BLOCK_STRUCT* block
 }
 
 MY_SLAB_STRUCT*         MY_SLAB_FN_CREATE           (MY_SLAB_STRUCT* slab) {
-    MY_ADOPT_OR_ALLOC(slab, MY_SLAB_STRUCT);
+    MY_STRUCT_CREATE_RULE(slab, MY_SLAB_STRUCT);
     MY_SLAB_FN_CREATE_BLOCK(&slab->block);
     return slab;
 }
@@ -125,7 +125,7 @@ void                    MY_SLAB_FN_DESTROY          (MY_SLAB_STRUCT* slab) {
         MY_SLAB_FN_DESTROY_BLOCK(current);
         current = next;
     }
-    MY_FREE_ADOPTED(slab);
+    MY_STRUCT_DESTROY_RULE(slab);
 }
 
 void                    MY_SLAB_FN_CLEAR            (MY_SLAB_STRUCT* slab) {

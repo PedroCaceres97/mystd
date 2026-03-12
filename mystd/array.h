@@ -88,7 +88,7 @@ struct MY_ARRAY_STRUCT {
 MY_RWLOCK_DEFINES(MY_ARRAY_STRUCT, array, MY_ARRAY_FN_PREFIX)
 
 MY_ARRAY_STRUCT*    MY_ARRAY_FN_CREATE      (MY_ARRAY_STRUCT* array) {
-    MY_ADOPT_OR_ALLOC(array, MY_ARRAY_STRUCT);
+    MY_STRUCT_CREATE_RULE(array, MY_ARRAY_STRUCT);
     array->size = 0;
     memset(array->data, 0, MY_ARRAY_SIZE);
     return array;
@@ -100,7 +100,7 @@ void                MY_ARRAY_FN_DESTROY     (MY_ARRAY_STRUCT* array) {
         MY_ARRAY_FN_CLEAR(array);
     }
 
-    MY_FREE_ADOPTED(array);
+    MY_STRUCT_DESTROY_RULE(array);
 }
 
 MY_ARRAY_DATA_TYPE* MY_ARRAY_FN_DATA        (MY_ARRAY_STRUCT* array) {

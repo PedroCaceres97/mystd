@@ -7,7 +7,7 @@ MyLoaderFile* MyLoader_Create(MyLoaderFile* file, const char* filepath) {
     size_t len = strlen(filepath);
     MY_ASSERT(len < MY_LOADER_FILEPATH_SIZE, MySprintf("Filepath lenght (%zu) exceeds MY_LOADER_FILEPATH_SIZE (%zu)", len, MY_LOADER_FILEPATH_SIZE));
     
-    MY_ADOPT_OR_ALLOC(file, MyLoaderFile);
+    MY_STRUCT_CREATE_RULE(file, MyLoaderFile);
 
     file->open = false;
     file->mode = MY_LOADER_NULL;
@@ -22,7 +22,7 @@ void MyLoader_Destroy(MyLoaderFile* file) {
     MyLoader_Close(file);
     MyString_Clear(&file->data);
     MyString_Destroy(&file->data);
-    MY_FREE_ADOPTED(file);
+    MY_STRUCT_DESTROY_RULE(file);
 }
 
 void MyLoader_Open(MyLoaderFile* file, MyLoaderMode mode) {

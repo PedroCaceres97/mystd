@@ -101,7 +101,7 @@ struct MY_VECTOR_STRUCT {
 MY_RWLOCK_DEFINES(MY_VECTOR_STRUCT, vec, MY_VECTOR_FN_PREFIX)
 
 MY_VECTOR_STRUCT*       MY_VECTOR_FN_CREATE     (MY_VECTOR_STRUCT* vec) {
-    MY_ADOPT_OR_ALLOC(vec, MY_VECTOR_STRUCT);
+    MY_STRUCT_CREATE_RULE(vec, MY_VECTOR_STRUCT);
     vec->size = 0;
     vec->capacity = MY_VECTOR_INITIAL_SIZE;
     MY_CALLOC(vec->data, MY_VECTOR_DATA_TYPE, vec->capacity);
@@ -112,7 +112,7 @@ void                    MY_VECTOR_FN_DESTROY    (MY_VECTOR_STRUCT* vec) {
     MY_ASSERT(vec->size == 0, "Destroying non empty MY_VECTOR (HINT: Clear the MY_VECTOR)");
 
     MY_FREE(vec->data);
-    MY_FREE_ADOPTED(vec);
+    MY_STRUCT_DESTROY_RULE(vec);
 }
 
 MY_VECTOR_DATA_TYPE*    MY_VECTOR_FN_DATA       (MY_VECTOR_STRUCT* vec) {

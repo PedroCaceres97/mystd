@@ -108,7 +108,7 @@ struct MY_LIST_STRUCT {
 MY_RWLOCK_DEFINES(MY_LIST_FN_PREFIX, list, MY_LIST_STRUCT)
 
 MY_LIST_STRUCT*         MY_LIST_FN_CREATE           (MY_LIST_STRUCT* list) {
-    MY_ADOPT_OR_ALLOC(list, MY_LIST_STRUCT);
+    MY_STRUCT_CREATE_RULE(list, MY_LIST_STRUCT);
     list->size = 0;
     list->front = NULL;
     list->back = NULL;
@@ -121,7 +121,7 @@ void                    MY_LIST_FN_DESTROY          (MY_LIST_STRUCT* list) {
         MY_LIST_FN_CLEAR(list, true);
     }
 
-    MY_FREE_ADOPTED(list);
+    MY_STRUCT_DESTROY_RULE(list);
 }
 
 MY_LIST_NODE_STRUCT*    MY_LIST_FN_GET              (MY_LIST_STRUCT* list, size_t idx) {

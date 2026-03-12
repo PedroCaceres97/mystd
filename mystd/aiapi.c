@@ -205,7 +205,7 @@ MY_RWLOCK_DEFINES(MyAIAPI, api, MyAIAPI)
 MyAIAPI*  MyAIAPI_Create        (MyAIAPI* api, MyAIAPIConfig config) {
     MY_ASSERT_PTR(config.model);
 
-    MY_ADOPT_OR_ALLOC(api, MyAIAPI);
+    MY_STRUCT_CREATE_RULE(api, MyAIAPI);
     memset(api->attached, 0, sizeof(api->attached));
     api->config = config;
 
@@ -321,7 +321,7 @@ void      MyAIAPI_Destroy       (MyAIAPI* api) {
     if (api->curl)      { curl_easy_cleanup(api->curl); }
 
     MY_FREE_IF(api->response);
-    MY_FREE_ADOPTED(api);
+    MY_STRUCT_DESTROY_RULE(api);
 }
 
 cJSON*    MyAIAPI_Send          (MyAIAPI* api, cJSON* message) {

@@ -67,7 +67,7 @@ void        MyTracker_Destroy(MyTracker* tracker) {
         MyTracker_Clear(tracker);
     }
 
-    MY_FREE_ADOPTED(tracker);
+    MY_STRUCT_DESTROY_RULE(tracker);
 }
 
 void        MyTracker_Clear(MyTracker* tracker) {

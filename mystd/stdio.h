@@ -115,6 +115,8 @@ MyFile* MyStdin();
 MyFile* MyStdout();
 MyFile* MyStderr();
 
+void MyFileEnableAnsi(MyFile* file);
+
 void MyFileClose(MyFile* file);
 MyFile* MyFileOpen(const char* path, MyFileFlag flag);
 uint8_t* MyFileDump(const char* path, size_t* size); /* Must free manually */

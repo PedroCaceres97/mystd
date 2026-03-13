@@ -128,6 +128,19 @@ MyFile* MyStderr(void) {
     return &myStderr;
 }
 
+void MyFileEnableAnsi(MyFile* file) {
+#ifdef MY_OS_WINDOWS
+    if (file != &myStdout || &myStderr) { return; }
+    DWORD dwMode = 0;
+    MY_ASSERT_WINBOOL(GetConsoleMode(file->handle, &dwMode));
+    
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
+    MY_ASSERT_WINBOOL(SetConsoleMode(file->handle, dwMode));
+#else
+    return;
+#endif
+}
+
 void MyFileClose(MyFile* file) {
     MY_ASSERT(!MyFileIsStd(file), "Trying to close an std file idiot");
     BOOL result = CloseHandle(file->handle);

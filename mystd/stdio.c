@@ -24,7 +24,7 @@ void MyLog_(MyLogLevel level, MyContext context, const char* msg) {
     const char* title = MY_LOG_TITLE;
     switch(level) {
         case MY_DEBUG: { 
-            #ifdef MY_LOG_DISABLE 
+            #ifdef MY_DEBUG_DISABLE 
                 return;
             #endif
             title = MY_DEBUG_TITLE;
@@ -246,7 +246,7 @@ void MyMakeDir(const char* path) {
     while (i < length) {
         if (temp[i] == '\\') {
             temp[i] = '\0';
-            MY_ASSERT(_mkdir(temp) == 0 || errno == EEXIST, "_mkdir failed");
+            MY_ASSERT(_mkdir(temp) == 0 || errno == EEXIST, MySprintf("_mkdir(%s) -> %s", temp, strerror(errno)));
             temp[i] = '\\';
         }
 

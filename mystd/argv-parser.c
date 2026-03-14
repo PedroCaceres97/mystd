@@ -25,6 +25,7 @@ static bool MyArgvParser_ParseShort(MyArgvParser* parser, const char* arg, const
         }
         return false;
     }
+    return false;
 }
 
 static void MyArgvParser_ParseLong(MyArgvParser* parser, const char* arg) {

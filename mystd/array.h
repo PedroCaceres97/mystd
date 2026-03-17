@@ -1,21 +1,20 @@
 #include <mystd/stdlib.h>
-#include <mystd/stdio.h>
 
 #ifndef MY_ARRAY_NAME
     #define MY_ARRAY_NAME MyArrayInt
-#endif /* MY_ARRAY_NAME */
+#endif
 
 #ifndef MY_ARRAY_FN_PREFIX
     #define MY_ARRAY_FN_PREFIX MY_ARRAY_NAME
-#endif /* MY_ARRAY_FN_PREFIX */
+#endif
 
 #ifndef MY_ARRAY_DATA_TYPE
     #define MY_ARRAY_DATA_TYPE int
-#endif /* MY_ARRAY_DATA_TYPE */
+#endif
 
 #ifndef MY_ARRAY_SIZE
-    #define MY_ARRAY_SIZE 10
-#endif /* MY_ARRAY_SIZE */
+    #define MY_ARRAY_SIZE 64
+#endif
 
 /** @cond doxygen_ignore */
 #define MY_ARRAY_STRUCT         MY_ARRAY_NAME
@@ -163,7 +162,6 @@ void                MY_ARRAY_FN_POP_BACK    (MY_ARRAY_STRUCT* array) {
     MY_ASSERT_PTR(array);
 
     if (array->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 
@@ -173,7 +171,6 @@ void                MY_ARRAY_FN_POP_FRONT   (MY_ARRAY_STRUCT* array) {
     MY_ASSERT_PTR(array);
 
     if (array->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 

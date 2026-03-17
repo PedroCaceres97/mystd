@@ -1,20 +1,19 @@
 #ifndef __MYSTD_STRING_H__
 #define __MYSTD_STRING_H__
 
-#include "stddef.h"
-#include <mystd/stdio.h>
+#include <mystd/stdlib.h>
 
 #ifndef MY_STRING_RESIZE_POLICIE
     #define MY_STRING_RESIZE_POLICIE(size) (size * 2)
-#endif /* MY_STRING_RESIZE_POLICIE */
+#endif
 
 #ifndef MY_STRING_SHRINK_POLICIE
     #define MY_STRING_SHRINK_POLICIE(capacity) (capacity / 4)
-#endif /* MY_STRING_SHRINK_POLICIE */
+#endif
 
 #ifndef MY_STRING_INITIAL_SIZE
-    #define MY_STRING_INITIAL_SIZE 10
-#endif /* MY_STRING_INITIAL_SIZE */
+    #define MY_STRING_INITIAL_SIZE 256
+#endif
 
 #ifdef __cplusplus
 extern "C" {

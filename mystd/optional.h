@@ -1,4 +1,3 @@
-#include "stddef.h"
 #include <mystd/stdlib.h>
 
 #ifndef MY_OPTIONAL_NAME
@@ -46,7 +45,7 @@ struct MY_OPTIONAL_STRUCT {
     MyStructHeader          header;
 
     MY_OPTIONAL_DATA_TYPE   data;
-    bool8                   has;
+    bool                   has;
 };
 
 #ifdef MY_OPTIONAL_IMPLEMENTATION

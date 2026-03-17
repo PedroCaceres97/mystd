@@ -1,8 +1,6 @@
 #ifndef __MYSTD_AIAPI_H__
 #define __MYSTD_AIAPI_H__
 
-#include "stddef.h"
-#include <mystd/stdio.h>
 #include <mystd/stdlib.h>
 
 #include <curl/curl.h>
@@ -10,7 +8,7 @@
 
 #ifndef MY_AIAPI_TOOL_COUNT
     #define MY_AIAPI_TOOL_COUNT 32
-#endif /* MY_AIAPI_TOOL_COUNT */
+#endif
 
 #ifdef __cplusplus
 extern "C" {

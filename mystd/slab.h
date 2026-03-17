@@ -1,21 +1,20 @@
-#include "mystd/stddef.h"
-#include <mystd/stdio.h>
+#include <mystd/stdlib.h>
 
 #ifndef MY_SLAB_NAME
     #define MY_SLAB_NAME MySlabInt
-#endif /* MY_SLAB_NAME */
+#endif
 
 #ifndef MY_SLAB_FN_PREFIX
     #define MY_SLAB_FN_PREFIX MY_SLAB_NAME
-#endif /* MY_SLAB_FN_PREFIX */
+#endif
 
 #ifndef MY_SLAB_DATA_TYPE
     #define MY_SLAB_DATA_TYPE int
-#endif /* MY_SLAB_DATA_TYPE */
+#endif
 
 #ifndef MY_SLAB_OBJECTS_COUNT
     #define MY_SLAB_OBJECTS_COUNT 1024
-#endif /* MY_SLAB_OBJECTS_COUNT */
+#endif
 
 /** @cond doxygen_ignore */
 #define MY_SLAB_STRUCT              MY_SLAB_NAME
@@ -67,10 +66,10 @@ void                  MY_SLAB_FN_DUMP           (MY_SLAB_STRUCT* slab, MyFile* f
 struct MY_SLAB_BLOCK_STRUCT {
     MY_SLAB_DATA_TYPE               mem[MY_SLAB_OBJECTS_COUNT];
     MY_SLAB_DATA_TYPE*              free_stack[MY_SLAB_OBJECTS_COUNT];
-    bool8                           allocated_table[MY_SLAB_OBJECTS_COUNT];
+    bool                           allocated_table[MY_SLAB_OBJECTS_COUNT];
     struct MY_SLAB_BLOCK_STRUCT*    next;
     size_t                          free_count;
-    bool8                           allocated;
+    bool                           allocated;
 };
 
 struct MY_SLAB_STRUCT {

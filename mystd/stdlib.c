@@ -5,7 +5,23 @@ extern "C" {
 #endif
 
 #if defined(MY_OS_WINDOWS)
-    #include <mystd/stdwin.h>
+    #include <io.h>
+    #include <direct.h>
+    #include <windows.h>
+    #include <sys/stat.h>
+
+    #define MY_ASSERT_WIN(x) do { if (!(x)) { MyWindowsPrintLastError(MY_CONTEXT); MyExit(); } } while(false)
+    #define MY_ASSERT_WINBOOL(x) MY_ASSERT_WIN(x != 0)
+    #define MY_ASSERT_WINHANDLE(x) MY_ASSERT_WIN((x) != INVALID_HANDLE_VALUE && (x) != NULL)
+
+    static void MyOutput(const char* msg) {
+        DWORD written = 0;
+        WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), msg, strlen(msg), &written, NULL);
+    }
+    static void MyError(const char* msg) {
+        DWORD written = 0;
+        WriteFile(GetStdHandle(STD_ERROR_HANDLE), msg, strlen(msg), &written, NULL);
+    }
 
     void MyWindowsPrintLastError(MyContext context) {
         LPVOID lpMsgBuf;
@@ -15,281 +31,184 @@ extern "C" {
         MyAssertLog(lpMsgBuf, context);
         LocalFree(lpMsgBuf);
     }
-#elif defined(MY_OS_LINUX)
 
-#endif
+    struct MyFile {
+        HANDLE handle;
+        MyFileFlag flag;
+    };
 
-/* --------------------------------------------------------------------------
- * RAW
- * -------------------------------------------------------------------------- */
+    static struct MyFile myStdin = { .handle = NULL, .flag = MY_FILE_READ };
+    static struct MyFile myStdout = { .handle = NULL, .flag = MY_FILE_WRITE };
+    static struct MyFile myStderr = { .handle = NULL, .flag = MY_FILE_WRITE };
 
-void MyRawOutput(const char* msg) {
-#if defined(MY_OS_WINDOWS)
-    DWORD written = 0;
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), msg, strlen(msg), &written, NULL);
-#elif defined(MY_OS_LINUX)
+    static void MyFileEnableAnsi(MyFile* file) {
+        DWORD dwMode = 0;
+        MY_ASSERT_WINBOOL(GetConsoleMode(file->handle, &dwMode));
+        
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
+        MY_ASSERT_WINBOOL(SetConsoleMode(file->handle, dwMode));
+    }
+    static inline int MyFileIsStd(MyFile* file) {
+        return file == &myStdin || file == &myStdout || file == &myStderr;
+    }
+    static inline void MyInitStdHandlesOnce(void) {
+        static int initialized = false;
+        if (initialized) return;
 
-#endif
-}
-void MyRawError(const char* msg) {
-#if defined(MY_OS_WINDOWS)
-    DWORD written = 0;
-    WriteFile(GetStdHandle(STD_ERROR_HANDLE), msg, strlen(msg), &written, NULL);
-#elif defined(MY_OS_LINUX)
-    
-#endif
-}
+        myStdin.handle  = GetStdHandle(STD_INPUT_HANDLE);
+        myStdout.handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        myStderr.handle = GetStdHandle(STD_ERROR_HANDLE);
 
-char* MyRawStrcpy(char* dst, const char* end, const char* src) {
-    while (*src && dst < end) { *dst++ = *src++; }
-    return dst;
-}
-size_t MyRawSnprintf(char* dst, size_t max, const char* format, ...) {
-    if (!dst || !format || max == 0) return -1;
-    va_list args;
-    va_start(args, format);
+        MY_ASSERT_WINHANDLE(myStdin.handle);
+        MY_ASSERT_WINHANDLE(myStdout.handle);
+        MY_ASSERT_WINHANDLE(myStderr.handle);
 
-    char ch = 0;
-    const char* str= NULL;
-    size_t remaining = max;
-    while (*format && remaining > 1) {
-        if (*format != '%') {
-            ch = *format;
-            goto write_char;
-        }
+        MyFileEnableAnsi(&myStdout);
+        MyFileEnableAnsi(&myStderr);
 
-        format++;
-        if (*format == '%') {
-            ch = '%';
-            goto write_char;
-        }
-        if (*format == 'c') {
-            ch = (char)va_arg(args, int);
-            goto write_char;
-        }
-        if (*format == 's') {
-            str = va_arg(args, const char*);
-            if (!str) { str = "(null)"; }
-            goto write_string;
-        }
-        if (*format == 'i') {
-            int n = va_arg(args, int);
-            str = MyI32tos(n, false, false);
-            goto write_string;
-        }
-        if (*format == 'u') {
-            unsigned int n = va_arg(args, unsigned int);
-            str = MyU32tos(n, false, false);
-            goto write_string;
-        }
-        if (*format == 'z') {
-            size_t n = va_arg(args, size_t);
-            str = MySizetos(n);
-            goto write_string;
-        } 
-        if (*format == 'f') {
-            double n = va_arg(args, double);
-            str = MyF64tos(n, 6, false, false);
-            goto write_string;
-        }
-
-        ch = *format;
-
-    write_char:
-        *dst++ = ch;
-        remaining--;
-        format++;
-        continue;
-
-    write_string:
-        while (*str && remaining > 1) { *dst++ = *str++; remaining--; }
-        format++;
-        continue;
+        initialized = true;
     }
 
-    *dst = '\0';
-    va_end(args);
-    return max - remaining;
-}
+    MyFile* MyStdin(void) {
+        MyInitStdHandlesOnce();
+        return &myStdin;
+    }
+    MyFile* MyStdout(void) {
+        MyInitStdHandlesOnce();
+        return &myStdout;
+    }
+    MyFile* MyStderr(void) {
+        MyInitStdHandlesOnce();
+        return &myStderr;
+    }
 
-/* --------------------------------------------------------------------------
- * ASSERT
- * -------------------------------------------------------------------------- */
+    void MyFileClose(MyFile* file) {
+        MY_ASSERT(!MyFileIsStd(file), "Trying to close an std file idiot");
+        BOOL result = CloseHandle(file->handle);
+        MY_ASSERT_WINBOOL(result);
+        MY_FREE(file);
+    }
+    MyFile* MyFileOpen(const char* path, MyFileFlag flag) {
+        MyFile* file = NULL;
+        MY_CALLOC(file, struct MyFile, 1);
 
-MY_NORETURN void MyExit() {
-  #ifndef ABORT_ON_ERROR
-    exit(-1);
-  #else
-    abort();
-  #endif
-}
+        file->flag = flag;
 
-void MyAssertLog(const char* msg, MyContext context) {
-    char buffer[1024] = {0};
-    MyRawSnprintf(buffer, sizeof(buffer), "[MY_ASSERT FAILED]:\n Context: %s:%u (%s)\n Message: %s\n\n", context.file, context.line, context.func, msg);
-    MyRawError(buffer);
-}
-void MyAssertBoundsLog(size_t idx, size_t bounds, MyContext context) {
-    char buffer[1024] = {0};
-    MyRawSnprintf(buffer, sizeof(buffer), "[MY_ASSERT FAILED]:\n Context: %s:%u (%s)\n Message: Index (%z) out of bounds (%z)\n\n", context.file, context.line, context.func, idx, bounds);
-    MyRawError(buffer);
-}
+        DWORD access = 0;
+        DWORD creation = OPEN_EXISTING;
 
-/* --------------------------------------------------------------------------
- * ANSI
- * -------------------------------------------------------------------------- */
+        if (flag & MY_FILE_READ) { access |= GENERIC_READ; }
+        if (flag & MY_FILE_WRITE) { access |= GENERIC_WRITE; }
+        if (flag & MY_FILE_NEW) { creation = CREATE_ALWAYS; }
 
-static thread_local char myAnsiBuffers[MY_ANSI_BUFFERS][MY_ANSI_BUFFER_SIZE];
-static thread_local uint32_t myAnsiIndex = 0;
+        file->handle = CreateFileA(path, access, 0, NULL, creation, FILE_ATTRIBUTE_NORMAL, NULL);
+        MY_ASSERT_WINHANDLE(file->handle);
+        return file;
+    }
+    // Allocated buffer must be freed with MY_FREE
+    uint8_t* MyFileDump(const char* path, size_t* size) {
+        MyFile* file = MyFileOpen(path, MY_FILE_READ);
+        size_t _size = MyFileSize(file);
+        char* bytes = NULL;
+        MY_CALLOC(bytes, char, _size);
+        MyFileRead(file, bytes, _size);
+        MyFileClose(file);
+        if (size) { *size = _size; }
+        return (uint8_t*)bytes;
+    }
 
-static inline char* MyAnsiNextBuffer() {
-    myAnsiIndex++;
-    if (myAnsiIndex == MY_ANSI_BUFFERS) { myAnsiIndex = 0; }
-    return myAnsiBuffers[myAnsiIndex];
-}
+    size_t MyFileRead(MyFile* file, char* data, size_t max) {
+        MY_ASSERT_PTR(file);
+        MY_ASSERT_PTR(data);
+        MY_ASSERT(file->flag & MY_FILE_READ, "File is not readable");
 
-char* MyAnsiFg256(uint8_t n) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-    *buffer++ = '3';
-    *buffer++ = '8';
-    *buffer++ = ';';
-    *buffer++ = '5';
-    *buffer++ = ';';
+        if (max == 0) { return 0; }
 
-    buffer = MyU32tos_((uint32_t)n, buffer);
+        DWORD read = 0;
+        BOOL result = ReadFile(file->handle, data, max, &read, NULL);
+        MY_ASSERT_WINBOOL(result);
+        return (size_t)read;
+    }
+    size_t MyFileWrite(MyFile* file, const char* data, size_t max) {
+        MY_ASSERT_PTR(file);
+        MY_ASSERT_PTR(data);
+        MY_ASSERT(file->flag & MY_FILE_WRITE, "File is not writable");
 
-    *buffer++ = 'm';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiBg256(uint8_t n) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-    *buffer++ = '4';
-    *buffer++ = '8';
-    *buffer++ = ';';
-    *buffer++ = '5';
-    *buffer++ = ';';
+        if (max == 0) { return 0; }
 
-    buffer = MyU32tos_((uint32_t)n, buffer);
+        DWORD written = 0;
+        BOOL result = WriteFile(file->handle, data, max, &written, NULL);
+        MY_ASSERT_WINBOOL(result);
+        return (size_t)written;
+    }
+    size_t MyFilePrint(MyFile* file, const char* data) {
+        return MyFileWrite(file, data, strlen(data));
+    }
 
-    *buffer++ = 'm';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-    *buffer++ = '3';
-    *buffer++ = '8';
-    *buffer++ = ';';
-    *buffer++ = '2';
-    *buffer++ = ';';
-    
-    buffer = MyU32tos_((uint32_t)r, buffer);
-    *buffer++ = ';';
+    size_t MyFileSize(MyFile* file) {
+        MY_ASSERT_PTR(file);
+        LARGE_INTEGER LISize = {0};
+        BOOL result = GetFileSizeEx(file->handle, &LISize);
+        MY_ASSERT_WINBOOL(result);
+        return (size_t)LISize.QuadPart;
+    }
+    size_t MyFileSeek(MyFile* file, MySeekFlag flag, ptrdiff_t offset) {
+        MY_ASSERT_PTR(file);
+        DWORD method = 0;
+        switch (flag) {
+            case MY_SEEK_BEGIN:   method = FILE_BEGIN;     break;
+            case MY_SEEK_CURRENT: method = FILE_CURRENT;   break;
+            case MY_SEEK_END:     method = FILE_END;       break;
+            default: MY_ASSERT(false, "Invalid seek flag");
+        }
 
-    buffer = MyU32tos_((uint32_t)g, buffer);
-    *buffer++ = ';';
+        LARGE_INTEGER LINew = {0};
+        LARGE_INTEGER LIOffset = {0};
+        LIOffset.QuadPart = offset;
+        BOOL result = SetFilePointerEx(file->handle, LIOffset, &LINew, flag);
+        MY_ASSERT_WINBOOL(result);
+        return (size_t)LINew.QuadPart;
+    }
 
-    buffer = MyU32tos_((uint32_t)b, buffer);
+    void MyMakeDir(const char* path) {
+        MY_ASSERT_PTR(path);
+        if (MyDirExists(path)) { return; }
 
-    *buffer++ = 'm';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-    *buffer++ = '4';
-    *buffer++ = '8';
-    *buffer++ = ';';
-    *buffer++ = '2';
-    *buffer++ = ';';
-    
-    buffer = MyU32tos_((uint32_t)r, buffer);
-    *buffer++ = ';';
+        char* temp = MyNormalizedPath((char*)path);
+        size_t len = strlen(temp);
 
-    buffer = MyU32tos_((uint32_t)g, buffer);
-    *buffer++ = ';';
+        /* Skip drive letter */
+        size_t i = 0;
+        if (len >= 2 && temp[1] == ':') { i = 2; }
 
-    buffer = MyU32tos_((uint32_t)b, buffer);
+        while (i < len) {
+            if (temp[i] == '\\') {
+                temp[i] = '\0';
+                MY_ASSERT(_mkdir(temp) == 0 || errno == EEXIST, MySprintf("_mkdir(%s) -> %s", temp, strerror(errno)));
+                temp[i] = '\\';
+            }
 
-    *buffer++ = 'm';
-    *buffer++ = '\0';
-    return buffer;
-}
+            i++;
+        }
+        MY_ASSERT(_mkdir(temp) == 0 || errno == EEXIST, "_mkdir failed");
+    }
+    bool MyDirExists(const char* path) {
+        MY_ASSERT_PTR(path);
+        char* temp = MyNormalizedPath((char*)path);
+        struct _stat st;
+        return _stat(temp, &st) == 0 && st.st_mode & _S_IFDIR;
+    }
+    bool MyFileExists(const char* path) {
+        MY_ASSERT_PTR(path);
+        char* temp = MyNormalizedPath(temp);
+        struct _stat st;
+        return _stat(temp, &st) == 0 && st.st_mode & _S_IFREG;
+    }
+#elif defined(MY_OS_LINUX)
 
-char* MyAnsiCursorUp(uint16_t n) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
+#endif
 
-    buffer = MyU32tos_((uint32_t)n, buffer);
-
-    *buffer++ = 'A';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiCursorDown(uint16_t n) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-
-    buffer = MyU32tos_((uint32_t)n, buffer);
-
-    *buffer++ = 'B';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiCursorForward(uint16_t n) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-
-    buffer = MyU32tos_((uint32_t)n, buffer);
-
-    *buffer++ = 'C';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiCursorBack(uint16_t n) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-
-    buffer = MyU32tos_((uint32_t)n, buffer);
-
-    *buffer++ = 'D';
-    *buffer++ = '\0';
-    return buffer;
-}
-char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
-    char* buffer = MyAnsiNextBuffer();
-    *buffer++ = '\x1b';
-    *buffer++ = '[';
-    
-    buffer = MyU32tos_((uint32_t)y, buffer);
-    *buffer++ = ';';
-
-    buffer = MyU32tos_((uint32_t)x, buffer);
-
-    *buffer++ = 'H';
-    *buffer++ = '\0';
-    return buffer;
-}
-
-/* --------------------------------------------------------------------------
- * To String
- * -------------------------------------------------------------------------- */
-
-static thread_local char myTosBuffers[MY_TOS_BUFFERS][MY_TOS_BUFFER_SIZE];
-static thread_local uint32_t myTosIndex = 0;
+/* String related functions --------------------------------- */
 
 static const char MY_DIGITS[201] =
     "00010203040506070809"
@@ -362,9 +281,11 @@ static const double MY_ROUNDERS_F64[16] = {
     0.0000000000000005
 };
 
+static thread_local char myTosBuffers[MY_TOS_BUFFER_COUNT][MY_TOS_BUFFER_SIZE];
+static thread_local uint32_t myTosIndex = 0;
 static inline char* MyTosNextBuffer() {
     myTosIndex++;
-    if (myTosIndex == MY_TOS_BUFFERS) { myTosIndex = 0; }
+    if (myTosIndex == MY_TOS_BUFFER_COUNT) { myTosIndex = 0; }
     return myTosBuffers[myTosIndex];
 }
 
@@ -599,13 +520,705 @@ const char* MyPtrdifftos(ptrdiff_t value) {
 #endif
 }
 
-void MyNormalizePath(char* path) {
+static thread_local char myPathBuffers[MY_PATH_BUFFER_COUNT][MY_PATH_BUFFER_SIZE];
+static thread_local uint32_t myPathIndex = 0;
+static inline char* MyPathNextBuffer() {
+    myPathIndex++;
+    if (myPathIndex == MY_PATH_BUFFER_COUNT) { myPathIndex = 0; }
+    return myPathBuffers[myPathIndex];
+}
+
+char* MyNormalizedPath(char* path) {
     MY_ASSERT_PTR(path);
-#ifdef MY_OS_WINDOWS
-    while (*path) { if (*path == '/') { *path = '\\'; } path++; }
-#else
-    while (*path) { if (*path == '\\') { *path = '/'; } path++; }
-#endif
+    size_t len = strlen(path);
+    char* buffer = MyPathNextBuffer();
+    MY_ASSERT(len < MY_PATH_BUFFER_SIZE, "Path lenght (%zu) is bigger than MY_PATH_BUFFER_SIZE (%zu)", len, MY_PATH_BUFFER_SIZE);
+    strcpy(buffer, path);
+    for (size_t i = 0; i < MY_PATH_BUFFER_SIZE; i++) { 
+        #ifdef MY_OS_WINDOWS
+            if (buffer[i] == '/') { buffer[i] = '\\'; } 
+        #else
+            if (buffer[i] == '\\') { buffer[i] = '/'; }
+        #endif
+    }
+    return buffer;
+}
+char* MyFirstPathDivisor(char* path) {
+    char* p = strchr(path, '/');
+    if (!p) { p = strchr(path, '\\'); }
+    return p;
+}
+char* MyLastPathDivisor(char* path) {
+    char* p = strrchr(path, '/');
+    if (!p) { p = strrchr(path, '\\'); }
+    return p;
+}
+
+/* Printf implementation --------------------------------- */
+
+static thread_local char myPrintfBuffers[MY_PRINTF_BUFFER_COUNT][MY_PRINTF_BUFFER_SIZE];
+static thread_local uint32_t myPrintfIndex = 0;
+static inline char* MyPrintfNextBuffer() {
+    myPrintfIndex++;
+    if (myPrintfIndex == MY_PRINTF_BUFFER_COUNT) { myPrintfIndex = 0; }
+    return myPrintfBuffers[myPrintfIndex];
+}
+
+typedef enum {
+	MY_VSN_LEN_NONE, 
+    MY_VSN_LEN_HH, 
+    MY_VSN_LEN_H, 
+    MY_VSN_LEN_L, 
+    MY_VSN_LEN_LL,
+    MY_VSN_LEN_Z
+} MyVsnLengthModifier;
+
+size_t MyPrintf(const char* format, ...) {
+    MY_ASSERT_PTR(format);
+    va_list args;
+    va_start(args, format);
+    char* buffer = MyPrintfNextBuffer();
+    size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
+    MyFilePrint(MyStdout(), buffer);
+    va_end(args);
+    return written;
+}
+size_t MyFprintf(MyFile* file, const char* format, ...) {
+    MY_ASSERT_PTR(format);
+    va_list args;
+    va_start(args, format);
+    char* buffer = MyPrintfNextBuffer();
+    size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
+    MyFilePrint(file, buffer);
+    va_end(args);
+    return written;
+}
+const char* MySprintf(const char* format, ...) {
+    MY_ASSERT_PTR(format);
+    va_list args;
+    va_start(args, format);
+    char* buffer = MyPrintfNextBuffer();
+    size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
+    va_end(args);
+    return buffer;
+}
+size_t MySnprintf(char* buffer, size_t max, const char* format, ...) {
+    MY_ASSERT_PTR(format);
+    va_list args;
+    va_start(args, format);
+    size_t written = MyVsnprintf(buffer, max, format, args);
+    va_end(args);
+    return written;
+}
+size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
+	MY_ASSERT_PTR(format);
+
+    char ch = 0;
+    size_t count = 0;
+    const char* str= NULL;
+
+    size_t written = 0;
+	while (*format) {
+		if (*format != '%') {
+			ch = *format;
+			goto write_char;
+		}
+
+		format++;
+
+        bool plus = false;
+        bool minus = false;
+        bool space = false;
+        bool zero = false;
+
+        int width = 0;
+        bool set_width = false;
+
+        int precision = 0;
+        bool set_precision = false;
+
+        MyVsnLengthModifier length = MY_VSN_LEN_NONE;
+
+        /* Flags */
+
+        while (true) {
+            if (*format == '+')         { plus = true;  format++; }
+            else if (*format == '-')    { minus = true; format++; }
+            else if (*format == ' ')    { space = true; format++; }
+            else if (*format == '0')    { zero = true;  format++; }
+            else { break; }
+        }
+
+        if (plus) { space = false; }
+        if (minus) { zero = false; }
+
+        /* Width */
+
+        if (*format == '*') {
+            format++;
+            int v_width = va_arg(args, int);
+            if (v_width >= 0) {
+                width = v_width;
+                set_width = true;
+            }
+        } else if (isdigit(*format)) {
+            set_width = true;
+            while (isdigit(*format)) {
+                width = width * 10 + (*format - '0');
+                format++;
+            }
+        }
+
+        /* Precision */
+
+        if (*format == '.') {
+            format++;
+            if (*format == '*') {
+                format++;
+                int v_precision = va_arg(args, int);
+                if (v_precision >= 0) {
+                    precision = v_precision;
+                    set_precision = true;
+                }
+            } else if (isdigit(*format)) {
+                set_precision = true;
+                while (isdigit(*format)) {
+                    precision = precision * 10 + (*format - '0');
+                    format++;
+                }
+            } else {
+                MY_ASSERT(false, "Founded '.' but no valid precision was parsed");
+            }
+        }
+
+        /* Length modifier */
+		
+        if (*format == 'h') {
+            format++;
+            length = MY_VSN_LEN_H;
+            if (*format == 'h') {
+                format++;
+                length = MY_VSN_LEN_HH;
+            }
+        } else if (*format == 'l') {
+            format++;
+            length = MY_VSN_LEN_L;
+            if (*format == 'l') {
+                format++;
+                length = MY_VSN_LEN_LL;
+            }
+        } else if (*format == 'z') {
+            format++;
+            length = MY_VSN_LEN_Z;
+        }
+		
+        /* Specifier */
+
+        /* Percentage */
+        if (*format == '%') {
+            ch = '%';
+            goto write_char;
+        }
+
+        /* Character */
+        if (*format == 'c') {
+            ch = (char)va_arg(args, int);
+            goto write_char;
+        }
+
+        /* String */
+        if (*format == 's') {
+            str = va_arg(args, const char*);
+            if (!str) { str = "(null)"; }
+            else {
+                size_t len = strlen(str);
+                count = len;
+                if (set_precision) { count = MY_MIN(len, (size_t)precision); }
+            }
+            goto write_string;
+        }
+
+        /* Signed */
+        if (*format == 'i' || *format == 'd') {
+            if (length == MY_VSN_LEN_Z) {
+                ptrdiff_t n = va_arg(args, ptrdiff_t);
+                str = MyPtrdifftos(n);
+                count = strlen(str);
+                goto write_string;
+            }
+
+            if (length == MY_VSN_LEN_LL) {
+                long long n = va_arg(args, long long);
+                str = MyI64tos((int64_t)n, plus, space);
+                count = strlen(str);
+                goto write_string;
+            }
+
+            int n = va_arg(args, int);
+            str = MyI32tos((int32_t)n, plus, space);
+            count = strlen(str);
+            goto write_string;
+        }
+
+        /* Unsigned */
+        if (*format == 'u') {
+            if (length == MY_VSN_LEN_Z) {
+                size_t n = va_arg(args, size_t);
+                str = MySizetos(n);
+                count = strlen(str);
+                goto write_string;
+            }
+
+            if (length == MY_VSN_LEN_LL) {
+                unsigned long long n = va_arg(args, unsigned long long);
+                str = MyU64tos((uint64_t)n, plus, space);
+                count = strlen(str);
+                goto write_string;
+            }
+
+            unsigned int n = va_arg(args, unsigned int);
+            str = MyU32tos((uint32_t)n, plus, space);
+            count = strlen(str);
+            goto write_string;
+        }
+
+        /* Hexadecimal */
+        if (*format == 'x') {
+            if (length == MY_VSN_LEN_LL) {
+                uint64_t n = va_arg(args, uint64_t);
+                str = MyX64tos(n);
+                count = strlen(str);
+                goto write_string;
+            }
+
+            uint32_t n = va_arg(args, uint32_t);
+            str = MyX32tos(n);
+            count = strlen(str);
+            goto write_string;
+        }
+
+        /* float / double */
+        if (*format == 'f') {
+            double n = va_arg(args, double);
+            str = MyF64tos(n, MY_TERNARY(set_precision, precision, 1), plus, space);
+            count = strlen(str);
+            goto write_string;
+        }
+
+        /* Pointer */
+        if (*format == 'p') {
+            void* ptr = va_arg(args, void*);
+            str = MyPtrtos(ptr);
+            count = strlen(str);
+            goto write_string;
+        }
+
+        /* Written */
+        /* TODO: Add lenght specifier behaviour */
+        if (*format == 'n') {
+            size_t* ptr = va_arg(args, size_t*);
+	        *ptr = written;
+            format++;
+            continue;
+        }
+        
+        // Invalid character
+        continue;
+
+    /* Writers */
+
+    write_char:
+        str = &ch;
+        count = 1;
+
+    /* TODO: Add Zero flag behaviour */
+    write_string:
+
+        /* Left Padding ('-' flag absent) */
+        if (set_width && count < width && !minus) {
+            for (size_t i = 0; i < width - count; i++) { 
+                if (buffer && written + 1 < max) { 
+                    *buffer++ = ' '; 
+                } 
+                written++; 
+            }
+        }
+
+        /* Write Content */
+        for (size_t i = 0; i < count && written + 1 < max; i++) { 
+            if (buffer && written + 1 < max) { 
+                *buffer++ = str[i]; 
+            } 
+            written++; 
+        }
+
+        /* Right Padding ('-' flag present) */
+        if (set_width && count < width && minus) {
+            for (size_t i = 0; i < width - count; i++) { 
+                if (buffer && written + 1 < max) { 
+                    *buffer++ = ' '; 
+                } 
+                written++; 
+            }
+        }
+
+        format++;
+        continue;
+	}
+
+    if (buffer) { *buffer = '\0'; } 
+	return written;
+}
+
+/* Assertions -------------------------------- */
+
+MY_NORETURN void MyExit() {
+  #ifndef ABORT_ON_ERROR
+    exit(-1);
+  #else
+    abort();
+  #endif
+}
+
+void MyAssertLog(const char* msg, MyContext context) {
+    char buffer[2048] = {0};
+    MySnprintf(buffer, sizeof(buffer), "[MYSTD ASSERT REPORT]:\n Context: %s:%u (%s)\n Message: %s\n\n", context.file, context.line, context.func, msg);
+    MySnprintf(buffer, sizeof(buffer), 
+        "\n%s\n %s " 
+        MY_ANSI_TEXT(MY_ANSI_ITALIC MY_ANSI_FG_256(189), "%s:%u -> %s()") "\n %s "
+        MY_MESSAGE_COLOR("%s") "\n\n", 
+        MY_ASSERT_TITLE, MY_CONTEXT_LABEL, context.file, context.line, context.func, MY_MESSAGE_LABEL, msg);
+    MyError(buffer);
+}
+void MyAssertBoundsLog(size_t idx, size_t bounds, MyContext context) {
+    char buffer[2048] = {0};
+    MySnprintf(buffer, sizeof(buffer), "[MYSTD ASSERT REPORT]:\n Context: %s:%u (%s)\n Message: Index (%zu) out of bounds (%zu)\n\n", context.file, context.line, context.func, idx, bounds);
+    MyError(buffer);
+}
+
+/* ANSI escape code sequences -------------------------- */
+
+static thread_local char myAnsiBuffers[MY_ANSI_BUFFER_COUNT][MY_ANSI_BUFFER_SIZE];
+static thread_local uint32_t myAnsiIndex = 0;
+static inline char* MyAnsiNextBuffer() {
+    myAnsiIndex++;
+    if (myAnsiIndex == MY_ANSI_BUFFER_COUNT) { myAnsiIndex = 0; }
+    return myAnsiBuffers[myAnsiIndex];
+}
+
+char* MyAnsiFg256(uint8_t n) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+    *buffer++ = '3';
+    *buffer++ = '8';
+    *buffer++ = ';';
+    *buffer++ = '5';
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)n, buffer);
+
+    *buffer++ = 'm';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiBg256(uint8_t n) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+    *buffer++ = '4';
+    *buffer++ = '8';
+    *buffer++ = ';';
+    *buffer++ = '5';
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)n, buffer);
+
+    *buffer++ = 'm';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+    *buffer++ = '3';
+    *buffer++ = '8';
+    *buffer++ = ';';
+    *buffer++ = '2';
+    *buffer++ = ';';
+    
+    buffer = MyU32tos_((uint32_t)r, buffer);
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)g, buffer);
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)b, buffer);
+
+    *buffer++ = 'm';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+    *buffer++ = '4';
+    *buffer++ = '8';
+    *buffer++ = ';';
+    *buffer++ = '2';
+    *buffer++ = ';';
+    
+    buffer = MyU32tos_((uint32_t)r, buffer);
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)g, buffer);
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)b, buffer);
+
+    *buffer++ = 'm';
+    *buffer++ = '\0';
+    return buffer;
+}
+
+char* MyAnsiCursorUp(uint16_t n) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+
+    buffer = MyU32tos_((uint32_t)n, buffer);
+
+    *buffer++ = 'A';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiCursorDown(uint16_t n) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+
+    buffer = MyU32tos_((uint32_t)n, buffer);
+
+    *buffer++ = 'B';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiCursorForward(uint16_t n) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+
+    buffer = MyU32tos_((uint32_t)n, buffer);
+
+    *buffer++ = 'C';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiCursorBack(uint16_t n) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+
+    buffer = MyU32tos_((uint32_t)n, buffer);
+
+    *buffer++ = 'D';
+    *buffer++ = '\0';
+    return buffer;
+}
+char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
+    char* buffer = MyAnsiNextBuffer();
+    *buffer++ = '\x1b';
+    *buffer++ = '[';
+    
+    buffer = MyU32tos_((uint32_t)y, buffer);
+    *buffer++ = ';';
+
+    buffer = MyU32tos_((uint32_t)x, buffer);
+
+    *buffer++ = 'H';
+    *buffer++ = '\0';
+    return buffer;
+}
+
+/* LOG System ---------------------------- */
+
+void MyLog_(MyLogLevel level, MyContext context, const char* msg) {
+#ifndef MY_LOG_DISABLE_ALL
+    char buffer[2048] = {0};
+    MyFile* file = MY_LOG_STDOUT_FILE;
+    const char* title = MY_INFO_TITLE;
+    switch(level) {
+        case MY_INFO: {
+            #ifdef MY_INFO_DISABLE 
+                return;
+            #endif
+            title = MY_INFO_TITLE;
+            break; 
+        }
+        case MY_DEBUG: { 
+            #if defined(NDEBUG) || (defined(MY_DEBUG_DISABLE) && !defined(NDEBUG)) 
+                return;
+            #endif
+            title = MY_DEBUG_TITLE;
+            break; 
+        }
+        case MY_SUCCESS: { 
+            #ifdef MY_SUCCESS_DISABLE 
+                return;
+            #endif
+            title = MY_SUCCESS_TITLE;
+            break; 
+        }
+        case MY_WARNING: { 
+            #ifdef MY_WARNING_DISABLE 
+                return;
+            #endif
+            title = MY_WARNING_TITLE;
+            file = MY_LOG_STDERR_FILE;
+            break; 
+        }
+        case MY_ERROR: { 
+            #ifdef MY_ERROR_DISABLE 
+                return;
+            #endif
+            title = MY_ERROR_TITLE;
+            file = MY_LOG_STDERR_FILE;
+            break; 
+        }
+        case MY_FATAL: { 
+            #ifdef MY_FATAL_DISABLE 
+                return;
+            #endif
+            title = MY_FATAL_TITLE;
+            file = MY_LOG_STDERR_FILE;
+            break; 
+        }
+        // Behaves like MY_INFO
+        default: {
+            #ifdef MY_INFO_DISABLE 
+                return;
+            #endif
+            title = MY_INFO_TITLE;
+            break; 
+        }
+    }
+
+    MySnprintf(buffer, sizeof(buffer), 
+        "\n%s\n %s " 
+        MY_ANSI_TEXT(MY_ANSI_ITALIC MY_ANSI_FG_256(189), "%s:%u -> %s()") "\n %s "
+        MY_MESSAGE_COLOR("%s") "\n\n", 
+        title, MY_CONTEXT_LABEL, context.file, context.line, context.func, MY_MESSAGE_LABEL, msg);
+    MyFilePrint(file, buffer);
+    if (level == MY_FATAL) { MyExit(); }
+#endif /* MY_LOG_DISABLE_ALL */
+}
+
+/* Argv parser ---------------------------- */
+
+static int MyArgvQsortCmp(const void* a, const void* b) {
+    MY_ASSERT_PTR(a);
+    MY_ASSERT_PTR(b);
+    const MyArgvFlag* f1 = *(const MyArgvFlag* const*)a;
+    const MyArgvFlag* f2 = *(const MyArgvFlag* const*)b;
+
+    const char* s1 = f1->longName ? f1->longName : "";
+    const char* s2 = f2->longName ? f2->longName : "";
+
+    return strcmp(s1, s2);
+}
+static int MyArgvBsearchCmp(const void* key, const void* elem) {
+    MY_ASSERT_PTR(key);
+    MY_ASSERT_PTR(elem);
+    const char* str = key;
+    const MyArgvFlag* flag = *(const MyArgvFlag* const*)elem;
+
+    const char* name = flag->longName ? flag->longName : "";
+    return strcmp(str, name);
+}
+
+static bool MyArgvParseShort(MyArgvFlag** shortNameJumpTable, const char* arg, const char* next) { 
+    /*
+        At this point is it guaranteed that arg starts with '-' and
+        has at least another characther following it.
+    */
+    MyArgvFlag* flag = shortNameJumpTable[(unsigned char)arg[1]];
+    if (flag == NULL) { return false; } // NULL indicates that arg[1] characther was not registered
+
+    flag->listener = true;
+
+    if (flag->expectValue) {
+        // As arg is guaranteed to have at least two characther we can check for null terminator in index 2 to check wheter value preceeds flag or is in 'next'
+        if (arg[2] != '\0') { 
+            strncpy(flag->value, &arg[2], 256 - 1); 
+            flag->value[256 - 1] = '\0';
+            return false;
+        } else { 
+            MY_ASSERT(next != NULL, "Any short form flag that requires a value must be preceeded by their value -> -[flag][value] o -[flag] [value]"); 
+            strncpy(flag->value, next, 256 - 1); 
+            flag->value[256 - 1] = '\0';
+            return true;
+        }
+    }
+    
+    return false;
+}
+static void MyArgvParseLong(MyArgvFlag** flags, size_t flagsc, const char* arg) {
+    /*
+        At this point is it guaranteed that arg starts with "--" and
+        has at least another characther following it.
+    */
+    char key[256] = {0};
+    size_t i = 0;
+    for (const char* p = arg + 2; *p && *p != '=' && i < sizeof(key)-1; p++) {
+        key[i++] = *p;
+    }
+    key[i] = '\0';
+    MyArgvFlag** pflag = bsearch(key, flags, flagsc, sizeof(MyArgvFlag*), MyArgvBsearchCmp);
+    if (pflag == NULL) { return; }
+
+    MyArgvFlag* flag = *pflag;
+    if (flag->longName == NULL) { return; }
+    size_t len = strlen(flag->longName);
+    flag->listener = true;
+
+    if (flag->expectValue) {
+        MY_ASSERT(arg[len + 2] == '=' && arg[len + 3] != '\0', "Any long form flag that requires a value must be preceeded by '=' and their value -> --[flag]=[value]"); 
+        strncpy(flag->value, &arg[len + 3], 256 - 1);
+        flag->value[256 - 1] = '\0';
+    }
+}
+
+void MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char** argv, int argc, void (*MyArgvUnkownFlagCallback)(const char*)) {
+    if (argc == 0) { return; } 
+    MY_ASSERT_PTR(argv);
+
+    qsort(flags, flagsc, sizeof(MyArgvFlag*), MyArgvQsortCmp);
+    MyArgvFlag* shortNameJumpTable[256] = {0};
+    for (size_t i = 0; i < flagsc; i++) {
+        if (flags[i]->shortName == 0) { continue; }
+        shortNameJumpTable[(unsigned char)flags[i]->shortName] = flags[i];
+    }
+    
+    for (int i = 0; i < argc; i++) {
+        const char* arg = argv[i];
+        const char* next = (i + 1 < argc) ? argv[i + 1] : NULL;
+
+        if (arg == NULL) { continue; }
+        if (arg[0] != '-') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring anything that does not begin with '-'
+        if (arg[1] == '\0') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring "-"
+
+        if (arg[1] == '-') {
+            if (arg[2] == '\0') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring "--"
+            MyArgvParseLong(flags, flagsc, arg);
+            continue;
+        }
+
+        if (MyArgvParseShort(shortNameJumpTable, arg, next)) {
+            i++;
+        }
+    }
 }
 
 #ifdef __cplusplus

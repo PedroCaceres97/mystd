@@ -1,4 +1,3 @@
-#include "mystd/stddef.h"
 #include <mystd/loader.h>
 
 MY_RWLOCK_DEFINES(MyLoaderFile, file, MyLoader)
@@ -53,7 +52,7 @@ void MyLoader_Close(MyLoaderFile* file) {
         return;
     }
 
-    MyFile* f = MyFileOpen(file->filepath, MY_FILE_FLAG_WRITE | MY_FILE_FLAG_NEW);
+    MyFile* f = MyFileOpen(file->filepath, MY_FILE_WRITE | MY_FILE_NEW);
     MyFileWrite(f, MyString_Cstr(&file->data), MyString_Size(&file->data));
     MyFileClose(f);
     file->open = false;

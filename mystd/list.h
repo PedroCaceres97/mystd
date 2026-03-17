@@ -1,18 +1,16 @@
-#include "mystd/stddef.h"
 #include <mystd/stdlib.h>
-#include <mystd/stdio.h>
 
 #ifndef MY_LIST_NAME
   #define MY_LIST_NAME MyListInt
-#endif /* MY_LIST_NAME */
+#endif
 
 #ifndef MY_LIST_FN_PREFIX
   #define MY_LIST_FN_PREFIX MY_LIST_NAME
-#endif /* MY_LIST_FN_PREFIX */
+#endif
 
 #ifndef MY_LIST_DATA_TYPE
   #define MY_LIST_DATA_TYPE int
-#endif /* MY_LIST_DATA_TYPE */
+#endif
 
 /** @cond doxygen_ignore */
 #define MY_LIST_STRUCT              MY_LIST_NAME
@@ -92,7 +90,7 @@ struct MY_LIST_NODE_STRUCT {
     MY_LIST_NODE_STRUCT*    prev;
     MY_LIST_STRUCT*         list;
     MY_LIST_DATA_TYPE       data;
-    bool8                   allocated;
+    bool                   allocated;
 };
 
 struct MY_LIST_STRUCT {
@@ -211,7 +209,6 @@ void                    MY_LIST_FN_POP_BACK         (MY_LIST_STRUCT* list, int d
     MY_ASSERT_PTR(list);
 
     if (list->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 
@@ -221,7 +218,6 @@ void                    MY_LIST_FN_POP_FRONT        (MY_LIST_STRUCT* list, int d
     MY_ASSERT_PTR(list);
 
     if (list->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 

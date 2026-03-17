@@ -1,8 +1,7 @@
 #ifndef __MYSTD_TRACKER_H__
 #define __MYSTD_TRACKER_H__ 
 
-#include "stddef.h"
-#include <mystd/stdio.h>
+#include <mystd/stdlib.h>
 
 #ifndef MY_TRACKER_FREE
     #define MY_TRACKER_FREE(ptr)                    do { free((void*)(ptr)); (ptr) = NULL;                                                                       } while(0)

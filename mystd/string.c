@@ -1,4 +1,3 @@
-#include "mystd/stddef.h"
 #include <mystd/string.h>
 
 #ifdef __cplusplus
@@ -111,7 +110,6 @@ void        MyString_PopBack    (MyString* str) {
     MY_ASSERT_PTR(str);
 
     if (str->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 
@@ -121,7 +119,6 @@ void        MyString_PopFront   (MyString* str) {
     MY_ASSERT_PTR(str);
 
     if (str->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 

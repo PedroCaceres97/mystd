@@ -1,8 +1,7 @@
 #ifndef __MYSTD_LOADER_H__
 #define __MYSTD_LOADER_H__
 
-#include "stddef.h"
-#include <mystd/stdio.h>
+#include <mystd/stdlib.h>
 #include <mystd/string.h>
 
 #ifndef MY_LOADER_FILEPATH_SIZE 
@@ -22,7 +21,7 @@ typedef struct MyLoaderFile {
     MyString        data;
     size_t          cursor;
     MyLoaderMode    mode;
-    bool8           open;
+    bool           open;
 } MyLoaderFile;
 
 MY_RWLOCK_DECLARES(MyLoaderFile, file, MyLoader)

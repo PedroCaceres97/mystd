@@ -1,4 +1,3 @@
-#include "stddef.h"
 #include <mystd/stdlib.h>
 
 #ifndef MY_VECTOR_NAME
@@ -218,7 +217,6 @@ void                    MY_VECTOR_FN_POP_BACK   (MY_VECTOR_STRUCT* vec) {
     MY_ASSERT_PTR(vec);
 
     if (vec->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 
@@ -228,7 +226,6 @@ void                    MY_VECTOR_FN_POP_FRONT  (MY_VECTOR_STRUCT* vec) {
     MY_ASSERT_PTR(vec);
 
     if (vec->size == 0) {
-        MY_EMPTY_POPPING();
         return;
     }
 

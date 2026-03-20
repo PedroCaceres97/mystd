@@ -391,7 +391,7 @@ char* MyAnsiCursorPos    (uint16_t x, uint16_t y);
     #define MY_ASSERT_COLOR(msg)    MY_ANSI_TEXT(MY_ANSI_FG_256(165), msg)
 #endif
 #ifndef MY_ASSERT_TITLE
-    #define MY_ASSERT_TITLE MY_ASSERT_COLOR("[MYSTD Assert Report]") 
+    #define MY_ASSERT_TITLE MY_ASSERT_COLOR("[Assert Report]") 
 #endif
 
 MY_NORETURN void MyExit();
@@ -484,12 +484,14 @@ void MyLog_(MyLogLevel level, MyContext context, const char* msg);
 
 typedef struct MyArgvFlag {
     char            value[256]; 
+    const char*     description;
     const char*     longName;
     char            shortName;
     bool            expectValue;
-    bool            listener;
+    bool            trigged;
 } MyArgvFlag;
 
-void MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char** argv, int argc, void (*MyArgvUnkownFlagCallback)(const char*));
+// returns true if --help was founded
+bool MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char* const* argv, int argc, void (*MyArgvUnkownFlagCallback)(const char*));
 
 #endif /* __MYSTD_STDLIB_H__ */

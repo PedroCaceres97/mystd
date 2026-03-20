@@ -579,7 +579,7 @@ size_t MyPrintf(const char* format, ...) {
     va_start(args, format);
     char* buffer = MyPrintfNextBuffer();
     size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
-    MyFilePrint(MyStdout(), buffer);
+    MyFileWrite(MyStdout(), buffer, written);
     va_end(args);
     return written;
 }
@@ -619,13 +619,6 @@ size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
 
     size_t written = 0;
 	while (*format) {
-		if (*format != '%') {
-			ch = *format;
-			goto write_char;
-		}
-
-		format++;
-
         bool plus = false;
         bool minus = false;
         bool space = false;
@@ -638,6 +631,13 @@ size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
         bool set_precision = false;
 
         MyVsnLengthModifier length = MY_VSN_LEN_NONE;
+
+        if (*format != '%') {
+			ch = *format;
+			goto write_char;
+		}
+
+		format++;
 
         /* Flags */
 
@@ -731,9 +731,8 @@ size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
             str = va_arg(args, const char*);
             if (!str) { str = "(null)"; }
             else {
-                size_t len = strlen(str);
-                count = len;
-                if (set_precision) { count = MY_MIN(len, (size_t)precision); }
+                count = strlen(str);
+                if (set_precision) { count = MY_MIN(count, (size_t)precision); }
             }
             goto write_string;
         }
@@ -884,7 +883,7 @@ void MyAssertLog(const char* msg, MyContext context) {
     char buffer[2048] = {0};
     MySnprintf(buffer, sizeof(buffer), "[MYSTD ASSERT REPORT]:\n Context: %s:%u (%s)\n Message: %s\n\n", context.file, context.line, context.func, msg);
     MySnprintf(buffer, sizeof(buffer), 
-        "\n%s\n %s " 
+        "%s\n %s " 
         MY_ANSI_TEXT(MY_ANSI_ITALIC MY_ANSI_FG_256(189), "%s:%u -> %s()") "\n %s "
         MY_MESSAGE_COLOR("%s") "\n\n", 
         MY_ASSERT_TITLE, MY_CONTEXT_LABEL, context.file, context.line, context.func, MY_MESSAGE_LABEL, msg);
@@ -1106,7 +1105,7 @@ void MyLog_(MyLogLevel level, MyContext context, const char* msg) {
     }
 
     MySnprintf(buffer, sizeof(buffer), 
-        "\n%s\n %s " 
+        "%s\n %s " 
         MY_ANSI_TEXT(MY_ANSI_ITALIC MY_ANSI_FG_256(189), "%s:%u -> %s()") "\n %s "
         MY_MESSAGE_COLOR("%s") "\n\n", 
         title, MY_CONTEXT_LABEL, context.file, context.line, context.func, MY_MESSAGE_LABEL, msg);
@@ -1138,7 +1137,7 @@ static int MyArgvBsearchCmp(const void* key, const void* elem) {
     return strcmp(str, name);
 }
 
-static bool MyArgvParseShort(MyArgvFlag** shortNameJumpTable, const char* arg, const char* next) { 
+static bool MyArgvParseShort(MyArgvFlag** shortNameJumpTable, const char* arg, const char* next, int* i) { 
     /*
         At this point is it guaranteed that arg starts with '-' and
         has at least another characther following it.
@@ -1146,25 +1145,24 @@ static bool MyArgvParseShort(MyArgvFlag** shortNameJumpTable, const char* arg, c
     MyArgvFlag* flag = shortNameJumpTable[(unsigned char)arg[1]];
     if (flag == NULL) { return false; } // NULL indicates that arg[1] characther was not registered
 
-    flag->listener = true;
+    flag->trigged = true;
 
     if (flag->expectValue) {
         // As arg is guaranteed to have at least two characther we can check for null terminator in index 2 to check wheter value preceeds flag or is in 'next'
         if (arg[2] != '\0') { 
             strncpy(flag->value, &arg[2], 256 - 1); 
             flag->value[256 - 1] = '\0';
-            return false;
         } else { 
-            MY_ASSERT(next != NULL, "Any short form flag that requires a value must be preceeded by their value -> -[flag][value] o -[flag] [value]"); 
+            MY_ASSERT(next != NULL, "Correct Usage: -[short flag][value] or -[short flag] [value]"); 
             strncpy(flag->value, next, 256 - 1); 
             flag->value[256 - 1] = '\0';
-            return true;
+            *i = *i + 1;
         }
     }
     
-    return false;
+    return true;
 }
-static void MyArgvParseLong(MyArgvFlag** flags, size_t flagsc, const char* arg) {
+static bool MyArgvParseLong(MyArgvFlag** flags, size_t flagsc, const char* arg) {
     /*
         At this point is it guaranteed that arg starts with "--" and
         has at least another characther following it.
@@ -1176,31 +1174,54 @@ static void MyArgvParseLong(MyArgvFlag** flags, size_t flagsc, const char* arg) 
     }
     key[i] = '\0';
     MyArgvFlag** pflag = bsearch(key, flags, flagsc, sizeof(MyArgvFlag*), MyArgvBsearchCmp);
-    if (pflag == NULL) { return; }
+    if (pflag == NULL) { return false; }
 
     MyArgvFlag* flag = *pflag;
-    if (flag->longName == NULL) { return; }
+    if (flag->longName == NULL) { return false; }
     size_t len = strlen(flag->longName);
-    flag->listener = true;
+    flag->trigged = true;
 
     if (flag->expectValue) {
-        MY_ASSERT(arg[len + 2] == '=' && arg[len + 3] != '\0', "Any long form flag that requires a value must be preceeded by '=' and their value -> --[flag]=[value]"); 
+        MY_ASSERT(arg[len + 2] == '=' && arg[len + 3] != '\0', "Correct Usage: --[flag]=[value]"); 
         strncpy(flag->value, &arg[len + 3], 256 - 1);
         flag->value[256 - 1] = '\0';
     }
+    return true;
+}
+static bool MyArgvParseHelp(MyArgvFlag** shortNameJumpTable, MyArgvFlag** flags, size_t flagsc, const char* arg) {
+    if (arg[1] == '\0') {
+        MyArgvFlag* flag = shortNameJumpTable[(unsigned char)arg[1]];
+        if (flag == NULL) { return false; } // NULL indicates that arg[1] characther was not registered
+        goto print;
+    }
+
+    MyArgvFlag** pflag = bsearch(arg, flags, flagsc, sizeof(MyArgvFlag*), MyArgvBsearchCmp);
+    if (pflag == NULL) { return false; }
+
+    MyArgvFlag* flag = *pflag;
+    if (flag->longName == NULL) { return false; }
+
+print:
+    MyPrintf("\nFlag: %s\nShort: %c %s\nExpects Value: %s\nDescription: %s\n", 
+        flag->longName, 
+        MY_TERNARY(flag->shortName == 0, '~', flag->shortName), MY_TERNARY(flag->shortName == 0, "(Doesnt have a shortcut)", ""),
+        MY_TERNARY(flag->expectValue, "Yes", "No"),
+        flag->description);
+    return true;
 }
 
-void MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char** argv, int argc, void (*MyArgvUnkownFlagCallback)(const char*)) {
-    if (argc == 0) { return; } 
+bool MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char* const* argv, int argc, void (*MyArgvUnkownFlagCallback)(const char*)) {
+    if (argc == 0) { return false; } 
     MY_ASSERT_PTR(argv);
 
     qsort(flags, flagsc, sizeof(MyArgvFlag*), MyArgvQsortCmp);
     MyArgvFlag* shortNameJumpTable[256] = {0};
     for (size_t i = 0; i < flagsc; i++) {
-        if (flags[i]->shortName == 0) { continue; }
+        if (flags[i]->shortName == 0 || flags[i]->shortName == '~') { continue; }
         shortNameJumpTable[(unsigned char)flags[i]->shortName] = flags[i];
     }
     
+    bool help = false;
     for (int i = 0; i < argc; i++) {
         const char* arg = argv[i];
         const char* next = (i + 1 < argc) ? argv[i + 1] : NULL;
@@ -1208,17 +1229,23 @@ void MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char** argv, int argc,
         if (arg == NULL) { continue; }
         if (arg[0] != '-') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring anything that does not begin with '-'
         if (arg[1] == '\0') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring "-"
-
-        if (arg[1] == '-') {
-            if (arg[2] == '\0') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring "--"
-            MyArgvParseLong(flags, flagsc, arg);
+        if (strcmp(arg, "--help") == 0) { 
+            MY_ASSERT(next != NULL && next[0] != '\0', "Correct usage: --help [flag] or --help [short flag]");
+            if (!MyArgvParseHelp(shortNameJumpTable, flags, flagsc, next)) { MyArgvUnkownFlagCallback(arg); }
+            help = true;
+            i++;
             continue;
         }
 
-        if (MyArgvParseShort(shortNameJumpTable, arg, next)) {
-            i++;
+        if (arg[1] == '-') {
+            if (arg[2] == '\0') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring "--"
+            if (!MyArgvParseLong(flags, flagsc, arg)) { MyArgvUnkownFlagCallback(arg); }
+            continue;
         }
+
+        if (!MyArgvParseShort(shortNameJumpTable, arg, next, &i)) { MyArgvUnkownFlagCallback(arg); }
     }
+    return help;
 }
 
 #ifdef __cplusplus

@@ -115,16 +115,16 @@ typedef struct MyContext {
 #define MY_CONTEXT_ALIAS(alias) ((MyContext){(alias), MY_FILE_PATH, __func__, __LINE__})
 
 #ifndef MY_CONTEXT_COLOR
-    #define MY_CONTEXT_COLOR(msg) MY_ANSI_TEXT(MY_ANSI_FG_256(244), msg)
+    #define MY_CONTEXT_COLOR 244
 #endif
 #ifndef MY_MESSAGE_COLOR
-    #define MY_MESSAGE_COLOR(msg) MY_ANSI_TEXT(MY_ANSI_FG_256(207), msg)
+    #define MY_MESSAGE_COLOR 207
 #endif
 #ifndef MY_CONTEXT_LABEL
-    #define MY_CONTEXT_LABEL    MY_CONTEXT_COLOR("Context:")
+    #define MY_CONTEXT_LABEL "Context"
 #endif
 #ifndef MY_MESSAGE_LABEL
-    #define MY_MESSAGE_LABEL    MY_CONTEXT_COLOR("Message:")
+    #define MY_MESSAGE_LABEL "Message"
 #endif
 
 /* RWLOCK ----------------------------------------------------------------- */
@@ -215,6 +215,43 @@ typedef struct MyStructHeader {
  * STDLIB And STDIO Section
  * -------------------------------------------------------------------------- */
 
+/* Filesystem --------------------------------- */
+
+typedef enum {
+    MY_FILE_QUERY   = 0,
+    MY_FILE_READ    = 1 << 1,
+    MY_FILE_WRITE   = 1 << 2,
+    MY_FILE_NEW     = 1 << 3
+} MyFileFlag;
+
+typedef enum {
+    MY_SEEK_BEGIN,
+    MY_SEEK_CURRENT,
+    MY_SEEK_END
+} MySeekFlag;
+
+typedef struct MyFile MyFile;
+
+MyFile* MyStdin();
+MyFile* MyStdout();
+MyFile* MyStderr();
+
+void MyFileClose(MyFile* file);
+MyFile* MyFileOpen(const char* path, MyFileFlag flag);
+// Allocated buffer must be freed with MY_FREE
+uint8_t* MyFileDump(const char* path, size_t* size);
+
+size_t MyFileRead(MyFile* file, char* data, size_t max);
+size_t MyFileWrite(MyFile* file, const char* data, size_t max);
+size_t MyFilePrint(MyFile* file, const char* data);
+
+size_t MyFileSize(MyFile* file);
+size_t MyFileSeek(MyFile* file, MySeekFlag flag, ptrdiff_t offset);
+
+void MyMakeDir(const char* dir);
+bool MyDirExists(const char* dir);
+bool MyFileExists(const char* file);
+
 /* String related functions --------------------------------- */
 
 #ifndef MY_TOS_BUFFER_SIZE
@@ -254,65 +291,13 @@ char* MyNormalizedPath(char* path);
 char* MyFirstPathDivisor(char* path);
 char* MyLastPathDivisor(char* path);
 
-/* Filesystem --------------------------------- */
-
-typedef enum {
-    MY_FILE_QUERY   = 0,
-    MY_FILE_READ    = 1 << 1,
-    MY_FILE_WRITE   = 1 << 2,
-    MY_FILE_NEW     = 1 << 3
-} MyFileFlag;
-
-typedef enum {
-    MY_SEEK_BEGIN,
-    MY_SEEK_CURRENT,
-    MY_SEEK_END
-} MySeekFlag;
-
-typedef struct MyFile MyFile;
-
-MyFile* MyStdin();
-MyFile* MyStdout();
-MyFile* MyStderr();
-
-void MyFileClose(MyFile* file);
-MyFile* MyFileOpen(const char* path, MyFileFlag flag);
-// Allocated buffer must be freed with MY_FREE
-uint8_t* MyFileDump(const char* path, size_t* size);
-
-size_t MyFileRead(MyFile* file, char* data, size_t max);
-size_t MyFileWrite(MyFile* file, const char* data, size_t max);
-size_t MyFilePrint(MyFile* file, const char* data);
-
-size_t MyFileSize(MyFile* file);
-size_t MyFileSeek(MyFile* file, MySeekFlag flag, ptrdiff_t offset);
-
-void MyMakeDir(const char* dir);
-bool MyDirExists(const char* dir);
-bool MyFileExists(const char* file);
-
-/* Printf implementation --------------------------------- */
-
-#ifndef MY_PRINTF_BUFFER_SIZE
-    #define MY_PRINTF_BUFFER_SIZE 1024
-#endif
-#ifndef MY_PRINTF_BUFFER_COUNT
-    #define MY_PRINTF_BUFFER_COUNT 16
-#endif
-
-size_t MyPrintf(const char* format, ...);
-size_t MyFprintf(MyFile* file, const char* format, ...);
-const char* MySprintf(const char* format, ...);
-size_t MySnprintf(char* buffer, size_t max, const char* format, ...);
-size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args);
-
 /* ANSI escape code sequences -------------------------- */
 
 #ifndef MY_ANSI_BUFFER_SIZE
     #define MY_ANSI_BUFFER_SIZE 128
 #endif
 #ifndef MY_ANSI_BUFFER_COUNT
-    #define MY_ANSI_BUFFER_COUNT 16
+    #define MY_ANSI_BUFFER_COUNT 32
 #endif
 
 #define MY_ANSI_ESC  "\x1b["
@@ -385,26 +370,88 @@ char* MyAnsiCursorForward(uint16_t n);
 char* MyAnsiCursorBack   (uint16_t n);
 char* MyAnsiCursorPos    (uint16_t x, uint16_t y);
 
-/* Assertions -------------------------------- */
+/* Printf implementation --------------------------------- */
 
-#ifndef MY_ASSERT_COLOR
-    #define MY_ASSERT_COLOR(msg)    MY_ANSI_TEXT(MY_ANSI_FG_256(165), msg)
+#ifndef MY_PRINTF_BUFFER_SIZE
+    #define MY_PRINTF_BUFFER_SIZE 2048
 #endif
-#ifndef MY_ASSERT_TITLE
-    #define MY_ASSERT_TITLE MY_ASSERT_COLOR("[Assert Report]") 
+#ifndef MY_PRINTF_BUFFER_COUNT
+    #define MY_PRINTF_BUFFER_COUNT 16
 #endif
+
+size_t MyPrintf(const char* format, ...);
+size_t MyFprintf(MyFile* file, const char* format, ...);
+const char* MySprintf(const char* format, ...);
+size_t MySnprintf(char* buffer, size_t max, const char* format, ...);
+size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args);
+
+/* LOG System ---------------------------- */
 
 MY_NORETURN void MyExit();
 
-void MyAssertLog(const char* msg, MyContext context);
-void MyAssertBoundsLog(size_t idx, size_t bounds, MyContext context);
+#ifndef MY_LOG_STDOUT_FILE
+    #define MY_LOG_STDOUT_FILE MyStdout()
+#endif
+#ifndef MY_LOG_STDERR_FILE
+    #define MY_LOG_STDERR_FILE MyStderr()
+#endif
 
-#define MY_ASSERT(cnd, format, ...)              do { if (!(cnd))            { MyAssertLog(MySprintf(format, ##__VA_ARGS__), MY_CONTEXT);   MyExit(); } } while(0)
-#define MY_ASSERT_PTR(ptr)                       do { if ((ptr) == NULL)     { MyAssertLog("'"#ptr "' is NULL", MY_CONTEXT);                MyExit(); } } while(0)
-#define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyAssertBoundsLog(idx, bound, MY_CONTEXT);                   MyExit(); } } while(0)
-#define MY_ASSERT_MALLOC(ptr, type, size)        do { if (ptr == NULL)       { MyAssertLog(MySprintf("Malloc failed for "  #ptr " of type " #type " and size %z",  size), MY_CONTEXT);   MyExit(); } } while(0)
-#define MY_ASSERT_CALLOC(ptr, type, count)       do { if (ptr == NULL)       { MyAssertLog(MySprintf("Calloc failed for "  #ptr " of type " #type " and count %zu", count), MY_CONTEXT); MyExit(); } } while(0)
-#define MY_ASSERT_REALLOC(ptr, type, size)       do { if (ptr == NULL)       { MyAssertLog(MySprintf("Realloc failed for " #ptr " of type " #type " and size %zu",  size), MY_CONTEXT);  MyExit(); } } while(0)
+#ifndef MY_INFO_COLOR
+    #define MY_INFO_COLOR      212
+#endif
+#ifndef MY_DEBUG_COLOR
+    #define MY_DEBUG_COLOR     87
+#endif
+#ifndef MY_SUCCESS_COLOR
+    #define MY_SUCCESS_COLOR   46
+#endif
+#ifndef MY_WARNING_COLOR
+    #define MY_WARNING_COLOR   214
+#endif
+#ifndef MY_ERROR_COLOR
+    #define MY_ERROR_COLOR     196
+#endif
+#ifndef MY_FATAL_COLOR
+    #define MY_FATAL_COLOR     165
+#endif
+
+#ifndef MY_INFO_TITLE
+    #define MY_INFO_TITLE       "INFO"
+#endif
+#ifndef MY_DEBUG_TITLE
+    #define MY_DEBUG_TITLE      "DEBUG"
+#endif
+#ifndef MY_SUCCESS_TITLE
+    #define MY_SUCCESS_TITLE    "SUCCESS"
+#endif
+#ifndef MY_WARNING_TITLE
+    #define MY_WARNING_TITLE    "WARNING"
+#endif
+#ifndef MY_ERROR_TITLE
+    #define MY_ERROR_TITLE      "ERROR"
+#endif
+#ifndef MY_FATAL_TITLE 
+    #define MY_FATAL_TITLE      "FATAL"
+#endif
+
+typedef enum {
+    MY_INFO,
+    MY_DEBUG,
+    MY_SUCCESS,
+    MY_WARNING,
+    MY_ERROR,
+    MY_FATAL,
+} MyLogLevel;
+
+void MyLogCtx(MyLogLevel level, MyContext context, const char* msg);
+#define MyLog(level, format, ...) MyLogCtx(level, MY_CONTEXT, MySprintf(format, ##__VA_ARGS__))
+
+#define MY_ASSERT(cnd, format, ...)              do { if (!(cnd))            { MyLog(MY_FATAL, format, ##__VA_ARGS__);                                                  } } while(0)
+#define MY_ASSERT_PTR(ptr)                       do { if ((ptr) == NULL)     { MyLog(MY_FATAL, "'"#ptr "' is NULL");                                                    } } while(0)
+#define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyLog(MY_FATAL, "Index (%zu) out of Bounds (%zu)", idx, bound)                           } } while(0)
+#define MY_ASSERT_MALLOC(ptr, type, size)        do { if (ptr == NULL)       { MyLog(MY_FATAL, "Malloc failed for "  #ptr " of type " #type " and size %zu",  size);    } } while(0)
+#define MY_ASSERT_CALLOC(ptr, type, count)       do { if (ptr == NULL)       { MyLog(MY_FATAL, "Calloc failed for "  #ptr " of type " #type " and count %zu", count);   } } while(0)
+#define MY_ASSERT_REALLOC(ptr, type, size)       do { if (ptr == NULL)       { MyLog(MY_FATAL, "Realloc failed for " #ptr " of type " #type " and size %zu",  size);    } } while(0)
 
 #if defined(MY_ASSERT_DISABLE) && defined(NDEBUG)
     #undef MY_ASSERT
@@ -420,65 +467,6 @@ void MyAssertBoundsLog(size_t idx, size_t bounds, MyContext context);
     #define MY_ASSERT_CALLOC(ptr, type, count)  do { ((void)0); } while(0)
     #define MY_ASSERT_REALLOC(ptr, type, size)  do { ((void)0); } while(0)
 #endif
-
-/* LOG System ---------------------------- */
-
-#ifndef MY_LOG_STDOUT_FILE
-    #define MY_LOG_STDOUT_FILE MyStdout()
-#endif
-#ifndef MY_LOG_STDERR_FILE
-    #define MY_LOG_STDERR_FILE MyStderr()
-#endif
-
-#ifndef MY_INFO_COLOR
-    #define MY_INFO_COLOR(msg)      MY_ANSI_TEXT(MY_ANSI_FG_256(212), msg)
-#endif
-#ifndef MY_DEBUG_COLOR
-    #define MY_DEBUG_COLOR(msg)     MY_ANSI_TEXT(MY_ANSI_FG_256(87),  msg)
-#endif
-#ifndef MY_SUCCESS_COLOR
-    #define MY_SUCCESS_COLOR(msg)   MY_ANSI_TEXT(MY_ANSI_FG_256(46),  msg)
-#endif
-#ifndef MY_WARNING_COLOR
-    #define MY_WARNING_COLOR(msg)   MY_ANSI_TEXT(MY_ANSI_FG_256(214), msg)
-#endif
-#ifndef MY_ERROR_COLOR
-    #define MY_ERROR_COLOR(msg)     MY_ANSI_TEXT(MY_ANSI_FG_256(196), msg)
-#endif
-#ifndef MY_FATAL_COLOR
-    #define MY_FATAL_COLOR(msg)     MY_ANSI_TEXT(MY_ANSI_FG_256(165), msg)
-#endif
-
-#ifndef MY_INFO_TITLE
-    #define MY_INFO_TITLE           MY_INFO_COLOR("[INFO]")
-#endif
-#ifndef MY_DEBUG_TITLE
-    #define MY_DEBUG_TITLE          MY_DEBUG_COLOR("[DEBUG]")
-#endif
-#ifndef MY_SUCCESS_TITLE
-    #define MY_SUCCESS_TITLE        MY_SUCCESS_COLOR("[SUCCESS]")
-#endif
-#ifndef MY_WARNING_TITLE
-    #define MY_WARNING_TITLE        MY_WARNING_COLOR("[WARNING]")
-#endif
-#ifndef MY_ERROR_TITLE
-    #define MY_ERROR_TITLE          MY_ERROR_COLOR("[ERROR]")
-#endif
-#ifndef MY_FATAL_TITLE 
-    #define MY_FATAL_TITLE          MY_FATAL_COLOR("[FATAL]")
-#endif
-
-typedef enum {
-    MY_INFO,
-    MY_DEBUG,
-    MY_SUCCESS,
-    MY_WARNING,
-    MY_ERROR,
-    MY_FATAL
-} MyLogLevel;
-
-void MyLog_(MyLogLevel level, MyContext context, const char* msg);
-#define MyLog(level, format, ...) MyLog_(level, MY_CONTEXT, MySprintf(format, ##__VA_ARGS__))
 
 /* Argv parser ---------------------------- */
 

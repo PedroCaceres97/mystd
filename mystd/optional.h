@@ -45,7 +45,7 @@ struct MY_OPTIONAL_STRUCT {
     MyStructHeader          header;
 
     MY_OPTIONAL_DATA_TYPE   data;
-    bool                   has;
+    bool                    has;
 };
 
 #ifdef MY_OPTIONAL_IMPLEMENTATION

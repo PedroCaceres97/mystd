@@ -181,6 +181,48 @@ typedef struct MyStructHeader {
     void MY_CONCAT2(fnprefix, _Rdunlock) (vtype* vname) { MY_ASSERT_PTR(vname); MY_RWLOCK_RDUNLOCK(vname->header.lock); } \
     void MY_CONCAT2(fnprefix, _Wrunlock) (vtype* vname) { MY_ASSERT_PTR(vname); MY_RWLOCK_WRUNLOCK(vname->header.lock); } \
 
+/* Variadic arguments --------------------------------- */
+
+typedef union {
+    int32_t     i32;
+    int64_t     i64;
+    uint32_t    u32;
+    uint64_t    u64;
+    size_t      sze;
+    ptrdiff_t   dif;
+    double      f64;
+    const char* str;
+    void*       ptr;
+} MyArg;
+
+#define ARGS(...) (MyArg[]){__VA_ARGS__}
+#define I32(x) (MyArg){ .i32 = (int32_t)(x) }
+#define I64(x) (MyArg){ .i64 = (int64_t)(x) }
+#define U32(x) (MyArg){ .u32 = (uint32_t)(x) }
+#define U64(x) (MyArg){ .u64 = (uint64_t)(x) }
+#define F32(x) (MyArg){ .f64 = (double)(x) }
+#define F64(x) (MyArg){ .f64 = (double)(x) }
+#define PTR(x) (MyArg){ .ptr = (void*)(x) }
+#define STR(x) (MyArg){ .str = (const char*)(x) }
+#define SIZE(x) (MyArg){ .sze = (size_t)(x) }
+#define DIFF(x) (MyArg){ .dif = (ptrdiff_t)(x) }
+
+typedef enum {
+    MY_ARGS_STDARG,
+    MY_ARGS_MYSTD,
+} MyArgsType;
+
+typedef struct {
+    union {
+        va_list stdarg;
+        MyArg* mystd;
+    } backend;
+    MyArgsType type;
+    size_t idx;
+} MyArgs;
+
+#define MyArgsGet(data, args, cast, field) if (args->type == MY_ARGS_STDARG) { data = va_arg(args->backend.stdarg, cast); } else { data = (cast)args->backend.mystd[args->idx++].field; }
+    
 /* Wrappers --------------------------------- */
 
 #define MY_STR_IMPL(x) #x
@@ -210,6 +252,7 @@ typedef struct MyStructHeader {
 
 #define MY_PTR_ADD(ptr, value)  ((void*)((uint8_t*)(ptr) + (value)))
 #define MY_PTR_SUB(ptr, value)  ((void*)((uint8_t*)(ptr) - (value)))
+#define MY_PTR_DIF(ptr1, ptr2)  ((size_t)((uintptr_t)ptr1 - (uintptr_t)ptr2))
 
 /* --------------------------------------------------------------------------
  * STDLIB And STDIO Section
@@ -379,11 +422,27 @@ char* MyAnsiCursorPos    (uint16_t x, uint16_t y);
     #define MY_PRINTF_BUFFER_COUNT 16
 #endif
 
-size_t MyPrintf(const char* format, ...);
-size_t MyFprintf(MyFile* file, const char* format, ...);
+typedef struct MyPrintfSegment {
+    const char* ansi;
+    const char* format;
+    MyArg* args;
+} MyPrintfSegment;
+
+#define SEG(ansi, format, ...) (MyPrintfSegment){ansi, format, ARGS(__VA_ARGS__)}
+
+size_t      MyPrintf(const char* format, ...);
+size_t      MyFprintf(MyFile* file, const char* format, ...);
 const char* MySprintf(const char* format, ...);
-size_t MySnprintf(char* buffer, size_t max, const char* format, ...);
-size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args);
+size_t      MySnprintf(char* buffer, size_t max, const char* format, ...);
+size_t      MyVsnprintf(char* buffer, size_t max, const char* format, va_list args);
+
+size_t      MyPrintfSegmentsN(MyPrintfSegment* segments, size_t count);
+const char* MySprintfSegmentsN(MyPrintfSegment* segments, size_t count);
+size_t      MySnprintfSegmentsN(char* buffer, size_t max, MyPrintfSegment* segments, size_t count);
+
+#define MyPrintfSegments(...)                  MyPrintfSegmentsN((MyPrintfSegment[]){__VA_ARGS__}, sizeof((MyPrintfSegment[]){__VA_ARGS__}) / sizeof(MyPrintfSegment))
+#define MySprintfSegments(...)                 MySprintfSegmentsN((MyPrintfSegment[]){__VA_ARGS__}, sizeof((MyPrintfSegment[]){__VA_ARGS__}) / sizeof(MyPrintfSegment))
+#define MySnprintfSegments(buffer, max, ...)   MySnprintfSegmentsN(buffer, max, (MyPrintfSegment[]){__VA_ARGS__}, sizeof((MyPrintfSegment[]){__VA_ARGS__}) / sizeof(MyPrintfSegment))
 
 /* LOG System ---------------------------- */
 
@@ -397,41 +456,41 @@ MY_NORETURN void MyExit();
 #endif
 
 #ifndef MY_INFO_COLOR
-    #define MY_INFO_COLOR      212
+    #define MY_INFO_COLOR      MY_ANSI_FG_256(212)
 #endif
 #ifndef MY_DEBUG_COLOR
-    #define MY_DEBUG_COLOR     87
+    #define MY_DEBUG_COLOR     MY_ANSI_FG_256(87)
 #endif
 #ifndef MY_SUCCESS_COLOR
-    #define MY_SUCCESS_COLOR   46
+    #define MY_SUCCESS_COLOR   MY_ANSI_FG_256(46)
 #endif
 #ifndef MY_WARNING_COLOR
-    #define MY_WARNING_COLOR   214
+    #define MY_WARNING_COLOR   MY_ANSI_FG_256(214)
 #endif
 #ifndef MY_ERROR_COLOR
-    #define MY_ERROR_COLOR     196
+    #define MY_ERROR_COLOR     MY_ANSI_FG_256(196)
 #endif
 #ifndef MY_FATAL_COLOR
-    #define MY_FATAL_COLOR     165
+    #define MY_FATAL_COLOR     MY_ANSI_FG_256(165)
 #endif
 
 #ifndef MY_INFO_TITLE
-    #define MY_INFO_TITLE       "INFO"
+    #define MY_INFO_TITLE       MY_ANSI_TEXT(MY_INFO_COLOR, "[INFO]")
 #endif
 #ifndef MY_DEBUG_TITLE
-    #define MY_DEBUG_TITLE      "DEBUG"
+    #define MY_DEBUG_TITLE      MY_ANSI_TEXT(MY_DEBUG_COLOR, "[DEBUG]")
 #endif
 #ifndef MY_SUCCESS_TITLE
-    #define MY_SUCCESS_TITLE    "SUCCESS"
+    #define MY_SUCCESS_TITLE    MY_ANSI_TEXT(MY_SUCCESS_COLOR, "[SUCCESS]")
 #endif
 #ifndef MY_WARNING_TITLE
-    #define MY_WARNING_TITLE    "WARNING"
+    #define MY_WARNING_TITLE    MY_ANSI_TEXT(MY_WARNING_COLOR, "[WARNING]")
 #endif
 #ifndef MY_ERROR_TITLE
-    #define MY_ERROR_TITLE      "ERROR"
+    #define MY_ERROR_TITLE      MY_ANSI_TEXT(MY_ERROR_COLOR, "[ERROR]")
 #endif
 #ifndef MY_FATAL_TITLE 
-    #define MY_FATAL_TITLE      "FATAL"
+    #define MY_FATAL_TITLE      MY_ANSI_TEXT(MY_FATAL_COLOR, "[FATAL]")
 #endif
 
 typedef enum {

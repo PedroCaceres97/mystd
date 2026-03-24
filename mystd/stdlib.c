@@ -717,7 +717,6 @@ MyPrintf syntax:
 
 ansi (optional): 
     '$' followed by some of the next characters that will indicate the ANSI attribute type
-    'R' = RESET
 
     'C' = CLEAR, has to be followed by one of the next numbers
         '0' = SCREEN
@@ -727,7 +726,7 @@ ansi (optional):
         '4' = LINE END
         '5' = LINE START
 
-    'U' = CURSOR, has to be followed by one of the next numbers
+    'P' = POSITION / CURSOR, has to be followed by one of the next numbers
         '0' = UP, must be followed by a single number (n)
         '1' = DOWN, must be followed by a single number (n)
         '2' = FORWARD, must be followed by a single number (n)
@@ -816,91 +815,293 @@ specifier:
 
 static thread_local char myPrintfBuffers[MY_PRINTF_BUFFER_COUNT][MY_PRINTF_BUFFER_SIZE];
 static thread_local uint32_t myPrintfIndex = 0;
-static inline char* MyPrintfNextBuffer() {
+static inline char* MyPrintfGetBuffer() {
     myPrintfIndex++;
     if (myPrintfIndex == MY_PRINTF_BUFFER_COUNT) { myPrintfIndex = 0; }
     return myPrintfBuffers[myPrintfIndex];
 }
 
-typedef struct MyPrintfSpecifier {
-    bool    ansi;
-    
-    bool    plus;
-    bool    minus;
-    bool    space;
+/* ============================================================
+   Buffer
+   ============================================================ */
 
-    int     width;
-    int     precision;
-    bool    setWidth;
-    bool    setPrecision;
+typedef struct {
+    char* data;
+    size_t max;
+    size_t written;
+} MyBuffer;
 
-    bool    lengthL;
-    bool    lengthZ;
-} MyPrintfSpecifier;
-
-typedef struct MyPrintfStatus {
-    va_list             args;
-    char*               buffer;
-    size_t              written;
-    size_t              max;
-    const char*         format;
-
-    char                c;
-    size_t              n;
-    const char*         s;
-    MyPrintfSpecifier   specifier;
-} MyPrintfStatus;
-
-typedef struct MyPrintfBasicColor {
-    const char* name;
-    const char* fg;
-    const char* bg;
-} MyPrintfBasicColor;
-
-static MyPrintfBasicColor myPrintfColors[] = {
-    {"black",   MY_ANSI_FG_BLACK,   MY_ANSI_BG_BLACK    },
-    {"red",     MY_ANSI_FG_RED,     MY_ANSI_BG_RED      },
-    {"green",   MY_ANSI_FG_GREEN,   MY_ANSI_BG_GREEN    },
-    {"yellow",  MY_ANSI_FG_YELLOW,  MY_ANSI_BG_YELLOW   },
-    {"blue",    MY_ANSI_FG_BLUE,    MY_ANSI_BG_BLUE     },
-    {"magenta", MY_ANSI_FG_MAGENTA, MY_ANSI_BG_MAGENTA  },
-    {"cyan",    MY_ANSI_FG_CYAN,    MY_ANSI_BG_CYAN     },
-    {"white",   MY_ANSI_FG_WHITE,   MY_ANSI_BG_WHITE    }
-};
-static MyPrintfBasicColor* MyPrintfMatchColor(MyPrintfStatus* status) {
-    for (int i = 0; i < 8; i++) {
-        size_t len = strlen(myPrintfColors[i].name);
-        if (strncmp(status->format, myPrintfColors[i].name, len) == 0) {
-            status->format += len;
-            return &myPrintfColors[i];
-        }
+static void MyBuffer_WriteChar(MyBuffer* buffer, char ch, size_t count) {
+    if (buffer->written < buffer->max && buffer->data != NULL) {
+        memset(&buffer->data[buffer->written], ch, MY_MIN(count, buffer->max - buffer->written));
     }
-    return NULL;
+    buffer->written += count;
+}
+static void MyBuffer_WriteN(MyBuffer* buffer, const char* src, size_t count) {
+    if (buffer->written < buffer->max && buffer->data != NULL) {
+        memcpy(&buffer->data[buffer->written], src, MY_MIN(count, buffer->max - buffer->written));
+    }
+    buffer->written += count;
+}
+static void MyBuffer_Write(MyBuffer* buffer, const char* src) {
+    MyBuffer_WriteN(buffer, src, strlen(src));
 }
 
-static const char* myPrintfClears[6] = {
-    MY_ANSI_CLEAR_SCREEN,
-    MY_ANSI_CLEAR_LINE,
-    MY_ANSI_CLEAR_TO_END,
-    MY_ANSI_CLEAR_TO_START,
-    MY_ANSI_CLEAR_LINE_END,
-    MY_ANSI_CLEAR_LINE_START,
+/* ============================================================
+   Format
+   ============================================================ */
+
+typedef struct {
+    const char* text;
+    MyArgs* args;
+} MyFormat;
+
+static bool MyFormat_IsOneOf(MyFormat* format, char* of) {
+    
+}
+static bool MyFormat_AdvanceIfEq(MyFormat* format, char ch) {
+    if (*format->text == ch) {
+        format->text++;
+        return true;
+    }
+    return false;
+}
+static bool MyFormat_ParseNumber(MyFormat* format, int* data) {
+    if (MyFormat_AdvanceIfEq(format, '*')) {
+        MyArgsGet(*data, format->args, int32_t, i32);
+        return true;
+    }
+
+    bool readed = isdigit(*format->text);
+    while(isdigit(*format->text)) {
+        *data = *data * 10 + (*format->text - '0'); 
+        format->text++;
+    }
+    return readed;
+}
+static bool MyFormat_ParseNextNumber(MyFormat* format, int* data) {
+    if (MyFormat_AdvanceIfEq(format, ',')) {
+        MyFormat_AdvanceIfEq(format, ' ');
+        MyFormat_ParseNumber(format, data);
+        return true;
+    }
+
+    return false;
+}
+
+/* ============================================================
+   Printf Spec
+   ============================================================ */
+
+typedef struct {
+    bool        plus;
+    bool        minus;
+    bool        space;
+
+    int         width;
+    int         precision;
+    bool        setWidth;
+    bool        setPrecision;
+
+    bool        lengthL;
+    bool        lengthZ;
+
+    char        temp;
+    const char* data;
+    size_t      length;
+} MyPrintfSpec;
+
+static void MyPrintfSpec_ParseFlags(MyPrintfSpec* spec, MyFormat* format) {
+    while (true) {
+        if (MyFormat_AdvanceIfEq(format, '+')) { spec->plus = true; }
+        else if (MyFormat_AdvanceIfEq(format, '-')) { spec->minus = true; }
+        else if (MyFormat_AdvanceIfEq(format, ' ')) { spec->space = true; }
+        else { break; }
+    }
+    if (spec->plus) { spec->space = false; }
+}
+static void MyPrintfSpec_ParseWidth(MyPrintfSpec* spec, MyFormat* format) {
+    spec->setWidth = MyFormat_ParseNumber(format, &spec->width);
+}
+static void MyPrintfSpec_ParsePrecision(MyPrintfSpec* spec, MyFormat* format) {
+    if (MyFormat_AdvanceIfEq(format, '.')) {
+        spec->setPrecision = true;
+        MyFormat_ParseNumber(format, &spec->precision);
+    }
+}
+static void MyPrintfSpec_ParseLenght(MyPrintfSpec* spec, MyFormat* format) {
+    if (MyFormat_AdvanceIfEq(format, 'z')) {
+        spec->lengthZ = true;
+        return;
+    }
+
+    if (MyFormat_AdvanceIfEq(format, 'l')) {
+        MyFormat_AdvanceIfEq(format, 'l');
+        spec->lengthL = true;
+        return;
+    }
+
+    MyFormat_AdvanceIfEq(format, 'h');
+    MyFormat_AdvanceIfEq(format, 'h');
+}
+
+static void MyPrintfSpec_ParsePP(MyPrintfSpec* spec, MyFormat* format) {
+    spec->temp = '%';
+    spec->data = &spec->temp;
+    spec->length = 1;
+}
+static void MyPrintfSpec_ParseC(MyPrintfSpec* spec, MyFormat* format) {
+    MyArgsGet(spec->temp, format->args, int32_t, i32);
+    spec->data = &spec->temp;
+    spec->length = 1;
+}
+static void MyPrintfSpec_ParseS(MyPrintfSpec* spec, MyFormat* format) {
+    MyArgsGet(spec->data, format->args, const char*, str);
+    if (!spec->data) { spec->data = "(null)"; }
+    spec->length = strlen(spec->data);
+    if (spec->setPrecision && spec->length > spec->precision) { spec->length = spec->precision; }
+}
+static void MyPrintfSpec_ParseI(MyPrintfSpec* spec, MyFormat* format) {
+    if (spec->lengthZ) {
+        ptrdiff_t value = 0;
+        MyArgsGet(value, format->args, ptrdiff_t, dif);
+        spec->data = MyPtrdifftos(value);
+        spec->length = strlen(spec->data);
+        return;
+    }
+    
+    if (spec->lengthL) {
+        int64_t value = 0;
+        MyArgsGet(value, format->args, int64_t, i64);
+        spec->data = MyI64tos(value, spec->plus, spec->space);
+        spec->length = strlen(spec->data);
+        return;
+    } 
+    
+    int32_t value = 0;
+    MyArgsGet(value, format->args, int32_t, i32);
+    spec->data = MyI32tos(value, spec->plus, spec->space);
+    spec->length = strlen(spec->data);
+}
+static void MyPrintfSpec_ParseU(MyPrintfSpec* spec, MyFormat* format) {
+    if (spec->lengthZ) {
+        size_t value = 0;
+        MyArgsGet(value, format->args, size_t, sze);
+        spec->data = MySizetos(value);
+        spec->length = strlen(spec->data);
+        return;
+    }
+    
+    if (spec->lengthL) {
+        uint64_t value = 0;
+        MyArgsGet(value, format->args, uint64_t, u64);
+        spec->data = MyU64tos(value, spec->plus, spec->space);
+        spec->length = strlen(spec->data);
+        return;
+    }
+
+    uint32_t value = 0;
+    MyArgsGet(value, format->args, uint32_t, i32);
+    spec->data = MyU32tos(value, spec->plus, spec->space);
+    spec->length = strlen(spec->data);
+}
+static void MyPrintfSpec_ParseX(MyPrintfSpec* spec, MyFormat* format) {
+    if (spec->lengthL) {
+        uint64_t value = 0;
+        MyArgsGet(value, format->args, uint64_t, i64);
+        spec->data = MyX64tos(value);
+        spec->length = strlen(spec->data);
+        return;
+    }
+    
+    uint32_t value = 0;
+    MyArgsGet(value, format->args, uint32_t, i32);
+    spec->data = MyX32tos(value);
+    spec->length = strlen(spec->data);
+}
+static void MyPrintfSpec_ParseF(MyPrintfSpec* spec, MyFormat* format) {
+    double value = 0;
+    MyArgsGet(value, format->args, double, f64);
+    spec->data = MyF64tos(value, MY_TERNARY(spec->setPrecision, spec->precision, 1), spec->plus, spec->space);
+    spec->length = strlen(spec->data);
+}
+static void MyPrintfSpec_ParseP(MyPrintfSpec* spec, MyFormat* format) {
+    void* value = 0;
+    MyArgsGet(value, format->args, void*, ptr);
+    spec->data = MyPtrtos(value);
+    spec->length = strlen(spec->data);
+}
+static void (*myPrintfSpecParsers[256])(MyPrintfSpec*, MyFormat*) = {
+    [0 ... 255] = NULL,
+    ['%'] = MyPrintfSpec_ParsePP,
+    ['c'] = MyPrintfSpec_ParseC,
+    ['s'] = MyPrintfSpec_ParseS,
+    ['i'] = MyPrintfSpec_ParseI,
+    ['u'] = MyPrintfSpec_ParseU,
+    ['x'] = MyPrintfSpec_ParseX,
+    ['f'] = MyPrintfSpec_ParseF,
+    ['p'] = MyPrintfSpec_ParseP,
 };
 
-static const char* myPrintfCursors[10] = {
-    "",
-    "",
-    "",
-    "",
-    "",
-    MY_ANSI_CURSOR_HOME,
-    MY_ANSI_CURSOR_SAVE,
-    MY_ANSI_CURSOR_RESTORE,
-    MY_ANSI_CURSOR_HIDE,
-    MY_ANSI_CURSOR_SHOW
-};
+void MyPrintfSpec_Parse(MyPrintfSpec* spec, MyFormat* format, MyBuffer* buffer) {
+    MyPrintfSpec_ParseFlags(spec, format);
+    MyPrintfSpec_ParseWidth(spec, format);
+    MyPrintfSpec_ParsePrecision(spec, format);
+    MyPrintfSpec_ParseLenght(spec, format);
 
-static const char* myPrintfStyles[10] = {
+    if (MyFormat_AdvanceIfEq(format, 'n')) {
+        size_t* n = NULL;
+        MyArgsGet(n, format->args, size_t*, ptr);
+        *n = buffer->written;
+        return;
+    }
+
+    void (*parser)(MyPrintfSpec*, MyFormat*) = myPrintfSpecParsers[tolower(*format->text++)];
+    if (!parser) { return; }
+
+    parser(spec, format);
+
+    if (spec->setWidth && spec->length < spec->width && !spec->minus) { 
+        // Left Padding
+        MyBuffer_WriteChar(buffer, ' ', spec->width - spec->length); 
+    }
+
+    // Write parsed content
+    MyBuffer_WriteN(buffer, spec->data, spec->length);
+
+    if (spec->setWidth && spec->length < spec->width && spec->minus) { 
+        // Right Padding
+        MyBuffer_WriteChar(buffer, ' ', spec->width - spec->length); 
+    }
+}
+
+/* ============================================================
+   ANSI
+   ============================================================ */
+
+static const char* myAnsiFgColors[256] = {
+    [0 ... 255] = NULL,
+    ['k'] = MY_ANSI_FG_BLACK,
+    ['r'] = MY_ANSI_FG_RED,
+    ['g'] = MY_ANSI_FG_GREEN,
+    ['y'] = MY_ANSI_FG_YELLOW,
+    ['b'] = MY_ANSI_FG_BLUE,
+    ['m'] = MY_ANSI_FG_MAGENTA,
+    ['c'] = MY_ANSI_FG_CYAN,
+    ['w'] = MY_ANSI_FG_WHITE,
+};
+static const char* myAnsiBgColors[256] = {
+    [0 ... 255] = NULL,
+    ['k'] = MY_ANSI_BG_BLACK,
+    ['r'] = MY_ANSI_BG_RED,
+    ['g'] = MY_ANSI_BG_GREEN,
+    ['y'] = MY_ANSI_BG_YELLOW,
+    ['b'] = MY_ANSI_BG_BLUE,
+    ['m'] = MY_ANSI_BG_MAGENTA,
+    ['c'] = MY_ANSI_BG_CYAN,
+    ['w'] = MY_ANSI_BG_WHITE,
+};
+static const char* myAnsiStyles[10] = {
     MY_ANSI_BOLD,
     MY_ANSI_DIM,
     MY_ANSI_ITALIC,
@@ -912,304 +1113,147 @@ static const char* myPrintfStyles[10] = {
     MY_ANSI_DOUBLE_UNDER,
     MY_ANSI_OVERLINE
 };
+static const char* myAnsiClears[6] = {
+    MY_ANSI_CLEAR_SCREEN,
+    MY_ANSI_CLEAR_LINE,
+    MY_ANSI_CLEAR_TO_END,
+    MY_ANSI_CLEAR_TO_START,
+    MY_ANSI_CLEAR_LINE_END,
+    MY_ANSI_CLEAR_LINE_START,
+};
+static const char* myAnsiCursors[10] = {
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    MY_ANSI_CURSOR_HOME,
+    MY_ANSI_CURSOR_SAVE,
+    MY_ANSI_CURSOR_RESTORE,
+    MY_ANSI_CURSOR_HIDE,
+    MY_ANSI_CURSOR_SHOW
+};
+static char* (*myPrintfCursorsX[10])(uint16_t) = {
+    MyAnsiCursorUp,
+    MyAnsiCursorDown,
+    MyAnsiCursorForward,
+    MyAnsiCursorBack,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+};
 
-#define MyPrintfStrcpy(status, src) MyPrintfStrncpy(status, src, strlen(src))
-
-static void MyPrintfStrset(MyPrintfStatus* status,char ch, size_t count) {
-    status->written += count;
-    if (status->written >= status->max) { return; } 
-    count = MY_MIN(count, status->max - status->written);
-    memset(status->buffer, ch, count);
-    status->buffer += count;
+static void MyAnsi_ParseC(MyPrintfSpec* spec, MyFormat* format) {
+    int idx = 0;
+    MyFormat_ParseNumber(format, &idx);
+    spec->data = myAnsiClears[idx % 6];
 }
-static void MyPrintfStrncpy(MyPrintfStatus* status, const char* src, size_t count) {
-    status->written += count;
-    if (status->written >= status->max) { return; } 
-    count = MY_MIN(count, status->max - status->written);
-    memcpy(status->buffer, src, count);
-    status->buffer += count;
+static void MyAnsi_ParseP(MyPrintfSpec* spec, MyFormat* format) {
+    int x = 0;
+    int y = 0;
+    int idx = 0;
+    MyFormat_ParseNumber(format, &idx);
+    idx = idx % 10;
+
+    if (idx > 4) {
+        spec->data = myAnsiCursors[idx];
+        return;
+    }
+
+    MyFormat_ParseNumber(format, &x);
+    if (idx < 4) {
+        spec->data = myPrintfCursorsX[idx]((uint16_t)x);
+        return;
+    }
+
+    MyFormat_ParseNextNumber(format, &y);
+    spec->data = MyAnsiCursorPos((uint16_t)x, (uint16_t)y);
 }
-static void MyPrintfReadDigit(MyPrintfStatus* status, int* digit, int mod) {
-    if (*status->format == '*') {
-        *digit = va_arg(status->args, int) % mod;
-        status->format++;
-        return;
-    }
-
-    *digit = (*status->format++ - '0') % mod;
+static void MyAnsi_ParseS(MyPrintfSpec* spec, MyFormat* format) {
+    int idx = 0;
+    MyFormat_ParseNumber(format, &idx);
+    spec->data = myAnsiStyles[idx % 10];
 }
-static bool MyPrintfReadNumber(MyPrintfStatus* status, int* number) {
-    if (*status->format == '*') {
-        *number = va_arg(status->args, int);
-        status->format++;
-        return true;
+static void MyAnsi_ParseF(MyPrintfSpec* spec, MyFormat* format) {
+    spec->data = myAnsiFgColors[*format->text];
+    if (spec->data) { 
+        format->text++;
+        return;
     }
 
-    bool readed = false;
-    while(isdigit(*status->format)) {
-        *number = *number * 10 + (*status->format - '0'); 
-        readed = true; 
-        status->format++;
+    int r = 0;
+    int g = 0;
+    int b = 0;
+
+    MyFormat_ParseNumber(format, &r);
+    if (!MyFormat_ParseNextNumber(format, &g)) {
+        spec->data = MyAnsiFg256((uint8_t)r);
+        return;
     }
-    return readed;
+
+    MyFormat_ParseNextNumber(format, &b);
+    spec->data = MyAnsiFgRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
 }
+static void MyAnsi_ParseB(MyPrintfSpec* spec, MyFormat* format) {
+    spec->data = myAnsiBgColors[*format->text];
+    if (spec->data) { 
+        format->text++;
+        return;
+    }
 
-#define MyPrintfLeftPad(status) if (status->specifier.setWidth && status->n < status->specifier.width && !status->specifier.minus) { MyPrintfStrset(status, ' ', status->specifier.width - status->n); }
-#define MyPrintfRightPad(status) if (status->specifier.setWidth && status->n < status->specifier.width && status->specifier.minus) { MyPrintfStrset(status, ' ', status->specifier.width - status->n); }
-static void MyPrintfWrite(MyPrintfStatus* status) {
-    MyPrintfLeftPad(status);
-    MyPrintfStrncpy(status, status->s, status->n);
-    MyPrintfRightPad(status);
-    if (status->specifier.ansi) { MyPrintfStrcpy(status, MY_ANSI_RESET); }
-    status->format++;
+    int r = 0;
+    int g = 0;
+    int b = 0;
+
+    MyFormat_ParseNumber(format, &r);
+    if (!MyFormat_ParseNextNumber(format, &g)) {
+        spec->data = MyAnsiBg256((uint8_t)r);
+        return;
+    }
+
+    MyFormat_ParseNextNumber(format, &b);
+    spec->data = MyAnsiBgRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
 }
+static void (*myAnsiParsers[256])(MyPrintfSpec*, MyFormat*) = {
+    [0 ... 255] = NULL,
+    ['C'] = MyAnsi_ParseC,
+    ['P'] = MyAnsi_ParseP,
+    ['S'] = MyAnsi_ParseS,
+    ['F'] = MyAnsi_ParseF,
+    ['B'] = MyAnsi_ParseB
+};
+static bool myAnsiParsersReset[256] = {
+    [0 ... 255] = false,
+    ['S'] = true,
+    ['F'] = true,
+    ['B'] = true
+};
 
-static void MyPrintfParseAnsi(MyPrintfStatus* status) {
-    int first = 0;
-    int second = 0;
-    int third = 0;
-
-    if (*status->format == '$') {
-        MyPrintfStrset(status, '$', 1);
-        status->format++;
-        return;
+static bool MyAnsi_Parse(MyPrintfSpec* spec, MyBuffer* buffer, MyFormat* format) {
+    if (!format->text) { return false; }
+    
+    bool reset = false;
+    while (*format->text) {
+        char key = *format->text++;
+        void (*parser)(MyPrintfSpec*, MyFormat*) = myAnsiParsers[key];
+        if (parser == NULL) { continue; }
+        MyFormat_AdvanceIfEq(format, ':');
+        MyFormat_AdvanceIfEq(format, ' ');
+        parser(spec, format);
+        MyBuffer_Write(buffer, spec->data);
+        if (myAnsiParsersReset[key]) { reset = true; }
     }
-
-    if (*status->format == 'R') {
-        status->format++;
-        MyPrintfStrcpy(status, MY_ANSI_RESET);
-        return;
-    }
-
-    if (*status->format == 'C') {
-        status->format++;
-        int clear = 0;
-        MyPrintfReadDigit(status, &clear, 6);
-        MyPrintfStrcpy(status, myPrintfClears[clear]);
-        return;
-    }
-
-    if (*status->format == 'U') {
-        status->format++;
-
-        int cursor = 0;
-        MyPrintfReadDigit(status, &cursor, 10);
-        if (cursor > 4) {
-            MyPrintfStrcpy(status, myPrintfCursors[cursor]);
-            return;
-        }
-
-        MyPrintfReadNumber(status, &first);
-        
-        if (cursor == 0) {
-            MyPrintfStrcpy(status, MyAnsiCursorUp((uint16_t)first));
-            return;
-        }
-        if (cursor == 1) {
-            MyPrintfStrcpy(status, MyAnsiCursorDown((uint16_t)first));
-            return;
-        }
-        if (cursor == 2) {
-            MyPrintfStrcpy(status, MyAnsiCursorForward((uint16_t)first));
-            return;
-        }
-        if (cursor == 3) {
-            MyPrintfStrcpy(status, MyAnsiCursorBack((uint16_t)first));
-            return;
-        }
-        if (*status->format == ',') {
-            status->format++;
-            MyPrintfReadNumber(status, &second);
-        }
-        MyPrintfStrcpy(status, MyAnsiCursorPos((uint16_t)first, (uint16_t)second));
-        return;
-    }
-
-    status->specifier.ansi = true;
-
-    if (*status->format == 'S') {
-        status->format++;
-        int style = 0;
-        MyPrintfReadDigit(status, &style, 10);
-        MyPrintfStrcpy(status, myPrintfStyles[style]);
-        return;
-    }
-
-    if (*status->format == 'F') {
-        status->format++;
-
-        MyPrintfBasicColor* color = MyPrintfMatchColor(status);
-        if (color) { 
-            MyPrintfStrcpy(status, color->fg);
-            return;
-        }
-        
-        MyPrintfReadNumber(status, &first);
-        if (*status->format != ',') {
-            MyPrintfStrcpy(status, MyAnsiFg256((uint8_t)first));
-            return;
-        }
-
-        status->format++;
-        MyPrintfReadNumber(status, &second);
-        if (*status->format != ',') {
-            MyPrintfStrcpy(status, MyAnsiFgRGB((uint8_t)first, (uint8_t)second, (uint8_t)third));
-            return;
-        }
-
-        status->format++;
-        MyPrintfReadNumber(status, &third);
-        MyPrintfStrcpy(status, MyAnsiFgRGB((uint8_t)first, (uint8_t)second, (uint8_t)third));
-        return;
-    }
-
-    if (*status->format == 'B') {
-        status->format++;
-
-        MyPrintfBasicColor* color = MyPrintfMatchColor(status);
-        if (color) { 
-            MyPrintfStrcpy(status, color->bg);
-            return;
-        }
-        
-        MyPrintfReadNumber(status, &first);
-        if (*status->format != ',') {
-            MyPrintfStrcpy(status, MyAnsiBg256((uint8_t)first));
-            return;
-        }
-
-        status->format++;
-        MyPrintfReadNumber(status, &second);
-        if (*status->format != ',') {
-            MyPrintfStrcpy(status, MyAnsiBgRGB((uint8_t)first, (uint8_t)second, (uint8_t)third));
-            return;
-        }
-
-        status->format++;
-        MyPrintfReadNumber(status, &third);
-        MyPrintfStrcpy(status, MyAnsiBgRGB((uint8_t)first, (uint8_t)second, (uint8_t)third));
-        return;
-    }
-}
-static void MyPrintfParse(MyPrintfStatus* status) {
-    while (true) {
-        if (*status->format == '+')      { status->specifier.plus = true;  status->format++; }
-        else if (*status->format == '-') { status->specifier.minus = true; status->format++; }
-        else if (*status->format == ' ') { status->specifier.space = true; status->format++; }
-        else { break; }
-    }
-    if (status->specifier.plus) { status->specifier.space = false; }
-
-    status->specifier.setWidth = MyPrintfReadNumber(status, &status->specifier.width);
-
-    if (*status->format == '.') {
-        status->format++;
-        status->specifier.setPrecision = true;
-
-        MyPrintfReadNumber(status, &status->specifier.precision);
-    }
-
-	if (*status->format == 'l') {
-        status->format++;
-        status->specifier.lengthL = true;
-    } else if (*status->format == 'z') {
-        status->format++;
-        status->specifier.lengthZ = true;
-    }
-
-    if (*status->format == '%') {
-        status->s = "%";
-        status->n = 1;
-        return;
-    }
-
-    if (*status->format == 'c' || *status->format == 'C') {
-        status->c = (char)va_arg(status->args, int);
-        status->s = &status->c;
-        status->n = 1;
-        return;
-    }
-
-    if (*status->format == 's' || *status->format == 'S') {
-        status->s = va_arg(status->args, const char*);
-        if (!status->s) { status->s = "(null)"; }
-        status->n = strlen(status->s);
-        if (status->specifier.setPrecision && status->n > status->specifier.precision) { status->n = status->specifier.precision; }
-        return;
-    }
-
-    if (*status->format == 'i' || *status->format == 'I') {
-        if (status->specifier.lengthZ) {
-            ptrdiff_t value = va_arg(status->args, ptrdiff_t);
-            status->s = MyPtrdifftos(value);
-            status->n = strlen(status->s);
-            return;
-        }
-
-        if (status->specifier.lengthL) {
-            int64_t value = va_arg(status->args, int64_t);
-            status->s = MyI64tos(value, status->specifier.plus, status->specifier.space);
-            status->n = strlen(status->s);
-            return;
-        }
-
-        int32_t value = va_arg(status->args, int32_t);
-        status->s = MyI32tos(value, status->specifier.plus, status->specifier.space);
-        status->n = strlen(status->s);
-        return;
-    }
-
-    if (*status->format == 'u' || *status->format == 'U') {
-        if (status->specifier.lengthZ) {
-            size_t value = va_arg(status->args, size_t);
-            status->s = MySizetos(value);
-            status->n = strlen(status->s);
-            return;
-        }
-
-        if (status->specifier.lengthL) {
-            uint64_t value = va_arg(status->args, uint64_t);
-            status->s = MyU64tos(value, status->specifier.plus, status->specifier.space);
-            status->n = strlen(status->s);
-            return;
-        }
-
-        uint32_t value = va_arg(status->args, uint32_t);
-        status->s = MyU32tos(value, status->specifier.plus, status->specifier.space);
-        status->n = strlen(status->s);
-        return;
-    }
-
-    if (*status->format == 'x' || *status->format == 'X') {
-        if (status->specifier.lengthL) {
-            uint64_t value = va_arg(status->args, uint64_t);
-            status->s = MyX64tos(value);
-            status->n = strlen(status->s);
-            return;
-        }
-
-        uint32_t value = va_arg(status->args, uint32_t);
-        status->s = MyX32tos(value);
-        status->n = strlen(status->s);
-        return;
-    }
-
-    if (*status->format == 'f' || *status->format == 'F') {
-        double value = va_arg(status->args, double);
-        status->s = MyF64tos(value, MY_TERNARY(status->specifier.setPrecision, status->specifier.precision, 1), status->specifier.plus, status->specifier.space);
-        status->n = strlen(status->s);
-        return;
-    }
-
-    if (*status->format == 'p' || *status->format == 'P') {
-        void* value = va_arg(status->args, void*);
-        status->s = MyPtrtos(value);
-        status->n = strlen(status->s);
-        return;
-    }
+    return reset;
 }
 
-size_t MyPrintf(const char* format, ...) {
+/* ============================================================
+   Printf (Standard)
+   ============================================================ */
+
+size_t      MyPrintf(const char* format, ...) {
     MY_ASSERT_PTR(format);
     va_list args;
     va_start(args, format);
@@ -1219,7 +1263,7 @@ size_t MyPrintf(const char* format, ...) {
     va_end(args);
     return written;
 }
-size_t MyFprintf(MyFile* file, const char* format, ...) {
+size_t      MyFprintf(MyFile* file, const char* format, ...) {
     MY_ASSERT_PTR(format);
     va_list args;
     va_start(args, format);
@@ -1233,12 +1277,12 @@ const char* MySprintf(const char* format, ...) {
     MY_ASSERT_PTR(format);
     va_list args;
     va_start(args, format);
-    char* buffer = MyPrintfNextBuffer();
+    char* buffer = MyPrintfGetBuffer();
     size_t written = MyVsnprintf(buffer, MY_PRINTF_BUFFER_SIZE, format, args);
     va_end(args);
     return buffer;
 }
-size_t MySnprintf(char* buffer, size_t max, const char* format, ...) {
+size_t      MySnprintf(char* buffer, size_t max, const char* format, ...) {
     MY_ASSERT_PTR(format);
     va_list args;
     va_start(args, format);
@@ -1246,47 +1290,97 @@ size_t MySnprintf(char* buffer, size_t max, const char* format, ...) {
     va_end(args);
     return written;
 }
-size_t MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
-	MY_ASSERT_PTR(format);
+size_t      MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
+    MyBuffer buf = {0};
+    buf.max = max - 1;
+    buf.data = buffer;
+    buf.written = 0;
 
-    MyPrintfStatus status = {0};
-    status.max = max - 1;
-    status.args = args;
-    status.buffer = buffer;
-    status.format = format;
+    MyArgs arg = {0};
+    arg.type = MY_ARGS_STDARG;
+    arg.backend.stdarg = args;
 
-	while (*status.format) {
-		status.n = 1;
-        status.s = status.format;
-        status.specifier = (MyPrintfSpecifier){0};
+    MyFormat fmt = {0};
+    fmt.text = format;
+    fmt.args = &arg;
 
-        while (*status.format == '$') {
-            status.format++;
-            MyPrintfParseAnsi(&status);
-            status.n = 1;
-            status.s = status.format;
+    while (true) {
+        MyPrintfSpec spec = {0};
+        
+        const char* percentage = strchr(fmt.text, '%');
+        if (percentage == NULL) { 
+            MyBuffer_Write(&buf, fmt.text);
+            break;
         }
 
-        if (*status.format == '%') {
-            status.format++;
+        if (percentage != fmt.text) {
+            MyBuffer_WriteN(&buf, fmt.text, MY_PTR_DIF(percentage, fmt.text));
+        }
 
-            if (*status.format == 'n') {
-                size_t* ptr = va_arg(args, size_t*);
-	            *ptr = status.written;
-                status.format++;
-                continue;
+        fmt.text = percentage + 1;
+        MyPrintfSpec_Parse(&spec, &fmt, &buf);
+    }
+
+    if (buf.data) { buf.data[MY_MIN(buf.written, buf.max)] = '\0'; }
+    return buf.written;
+}
+
+/* ============================================================
+   Printf (Segments)
+   ============================================================ */
+
+size_t      MyPrintfSegmentsN(MyPrintfSegment* segments, size_t count) {
+    char buffer[MY_PRINTF_BUFFER_SIZE];
+    size_t written = MySnprintfSegmentsN(buffer, MY_PRINTF_BUFFER_SIZE, segments, count);
+    MyFileWrite(MyStdout(), buffer, written);
+    return written;
+}
+const char* MySprintfSegmentsN(MyPrintfSegment* segments, size_t count) {
+    char* buffer = MyPrintfGetBuffer();
+    size_t written = MySnprintfSegmentsN(buffer, MY_PRINTF_BUFFER_SIZE, segments, count);
+    return buffer;
+}
+size_t      MySnprintfSegmentsN(char* buffer, size_t max, MyPrintfSegment* segments, size_t count) {
+    MyBuffer buf = {0};
+    buf.max = max - 1;
+    buf.data = buffer;
+
+    for (size_t i = 0; i < count; i++) {
+        MyPrintfSpec spec = {0};
+
+        MyArgs arg = {0};
+        arg.type = MY_ARGS_MYSTD;
+        arg.backend.mystd = segments[i].args;
+
+        MyFormat fmt = {0};
+        fmt.args = &arg;
+        
+        fmt.text = segments[i].ansi;
+        bool reset = MyAnsi_Parse(&spec, &buf, &fmt);
+
+        fmt.text = segments[i].format;
+        while (true) {
+            spec = (MyPrintfSpec){0};
+
+            const char* percentage = strchr(fmt.text, '%');
+            if (percentage == NULL) { 
+                MyBuffer_Write(&buf, fmt.text);
+                break;
             }
-            MyPrintfParse(&status);
-        } else {
-            status.specifier.ansi = false;
+
+            if (percentage != fmt.text) {
+                MyBuffer_WriteN(&buf, fmt.text, MY_PTR_DIF(percentage, fmt.text));
+            }
+
+            fmt.text = percentage + 1;
+            MyPrintfSpec_Parse(&spec, &fmt, &buf);
         }
 
-        MyPrintfWrite(&status);
-        continue;
-	}
+        if (reset) { MyBuffer_Write(&buf, MY_ANSI_RESET); }
+    }
 
-    if (status.buffer) { *status.buffer = '\0'; } 
-	return status.written;
+    if (buf.data) { buf.data[MY_MIN(buf.written, buf.max)] = '\0'; }
+    return buf.written;
 }
 
 /* LOG System ---------------------------- */
@@ -1303,14 +1397,12 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
 #ifndef MY_LOG_DISABLE_ALL
     char buffer[2048] = {0};
     MyFile* file = MY_LOG_STDOUT_FILE;
-    int color = MY_INFO_COLOR;
     const char* title = MY_INFO_TITLE;
     switch(level) {
         case MY_INFO: {
             #ifdef MY_INFO_DISABLE 
                 return;
             #endif
-            color = MY_INFO_COLOR;
             title = MY_INFO_TITLE;
             break; 
         }
@@ -1318,7 +1410,6 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
             #if defined(NDEBUG) || (defined(MY_DEBUG_DISABLE) && !defined(NDEBUG)) 
                 return;
             #endif
-            color = MY_DEBUG_COLOR;
             title = MY_DEBUG_TITLE;
             break; 
         }
@@ -1326,7 +1417,6 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
             #ifdef MY_SUCCESS_DISABLE 
                 return;
             #endif
-            color = MY_SUCCESS_COLOR;
             title = MY_SUCCESS_TITLE;
             break; 
         }
@@ -1334,7 +1424,6 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
             #ifdef MY_WARNING_DISABLE 
                 return;
             #endif
-            color = MY_WARNING_COLOR;
             title = MY_WARNING_TITLE;
             file = MY_LOG_STDERR_FILE;
             break; 
@@ -1343,7 +1432,6 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
             #ifdef MY_ERROR_DISABLE 
                 return;
             #endif
-            color = MY_ERROR_COLOR;
             title = MY_ERROR_TITLE;
             file = MY_LOG_STDERR_FILE;
             break; 
@@ -1352,7 +1440,6 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
             #ifdef MY_FATAL_DISABLE 
                 return;
             #endif
-            color = MY_FATAL_COLOR;
             title = MY_FATAL_TITLE;
             file = MY_LOG_STDERR_FILE;
             break; 
@@ -1362,17 +1449,17 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
             #ifdef MY_INFO_DISABLE 
                 return;
             #endif
-            color = MY_INFO_COLOR;
             title = MY_INFO_TITLE;
             break;
         }
     }
 
-    MySnprintf(buffer, sizeof(buffer), 
-        "$F*[%s]$R\n $F244Context$R:$F189$S2 %s:%u -> %s()$R\n $F244Message$R: $F207%s\n\n",
-        color, title,
-        context.file, context.line, context.func,
-        msg
+    MySnprintfSegments(buffer, sizeof(buffer),
+        SEG("", "%s\n", STR(title)),
+        SEG("F: 244", "Context: "),
+        SEG("F: 189 S: 2", "%s:%u -> %s()\n", STR(context.file), I32(context.line), STR(context.func)),
+        SEG("F: 244", "Message: "),
+        SEG("F: 207", "%s\n\n", STR(msg))
     );
 
     MyFilePrint(file, buffer);
@@ -1468,11 +1555,20 @@ static bool MyArgvParseHelp(MyArgvFlag** shortNameJumpTable, MyArgvFlag** flags,
     if (flag->longName == NULL) { return false; }
 
 print:
-    MyPrintf("$F212Flag$R: $F189$S2%s\n$F212Short$R: $F189$S2%c %s\n$F212Expects Value$R: $F189$S2%s\n$F212Description$R: $F207%s\n\n", 
-        flag->longName, 
-        MY_TERNARY(flag->shortName == 0, '~', flag->shortName), MY_TERNARY(flag->shortName == 0, "(Doesnt have a shortcut)", ""),
-        MY_TERNARY(flag->expectValue, "Yes", "No"),
-        flag->description);
+    char shortName = MY_TERNARY(flag->shortName == 0, '~', flag->shortName);
+    const char* shortDesc = MY_TERNARY(flag->shortName == 0, "(Doesnt have a shortcut)", "");
+    const char* expects = MY_TERNARY(flag->expectValue, "Yes", "No");
+
+    MyPrintfSegments(
+        SEG("F: 212",       "Flag: "),
+        SEG("F: 189 S: 2",  "%s\n",         STR(flag->longName)),
+        SEG("F: 212",       "Short: "),
+        SEG("F: 189 S: 2",  "%c %s\n",      I32(shortName), STR(shortDesc)),
+        SEG("F: 212",       "Expects Value: "),
+        SEG("F: 189 S: 2",  "%s\n",         STR(expects)),
+        SEG("F: 212",       "Description: "),
+        SEG("F: 207",       "%s\n\n",       STR(flag->description))
+    );
     return true;
 }
 

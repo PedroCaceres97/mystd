@@ -188,24 +188,23 @@ typedef union {
     int64_t     i64;
     uint32_t    u32;
     uint64_t    u64;
-    size_t      sze;
-    ptrdiff_t   dif;
     double      f64;
-    const char* str;
     void*       ptr;
+    const char* str;
+    size_t      size;
+    ptrdiff_t   diff;
 } MyArg;
 
-#define ARGS(...) (MyArg[]){__VA_ARGS__}
-#define I32(x) (MyArg){ .i32 = (int32_t)(x) }
-#define I64(x) (MyArg){ .i64 = (int64_t)(x) }
-#define U32(x) (MyArg){ .u32 = (uint32_t)(x) }
-#define U64(x) (MyArg){ .u64 = (uint64_t)(x) }
-#define F32(x) (MyArg){ .f64 = (double)(x) }
-#define F64(x) (MyArg){ .f64 = (double)(x) }
-#define PTR(x) (MyArg){ .ptr = (void*)(x) }
-#define STR(x) (MyArg){ .str = (const char*)(x) }
-#define SIZE(x) (MyArg){ .sze = (size_t)(x) }
-#define DIFF(x) (MyArg){ .dif = (ptrdiff_t)(x) }
+#define ARGS(...)   (MyArg[]){__VA_ARGS__}
+#define I32(x)      (MyArg){ .i32 = (int32_t)(x) }
+#define I64(x)      (MyArg){ .i64 = (int64_t)(x) }
+#define U32(x)      (MyArg){ .u32 = (uint32_t)(x) }
+#define U64(x)      (MyArg){ .u64 = (uint64_t)(x) }
+#define F64(x)      (MyArg){ .f64 = (double)(x) }
+#define PTR(x)      (MyArg){ .ptr = (void*)(x) }
+#define STR(x)      (MyArg){ .str = (const char*)(x) }
+#define SIZE(x)     (MyArg){ .size = (size_t)(x) }
+#define DIFF(x)     (MyArg){ .diff = (ptrdiff_t)(x) }
 
 typedef enum {
     MY_ARGS_STDARG,
@@ -221,7 +220,60 @@ typedef struct {
     size_t idx;
 } MyArgs;
 
-#define MyArgsGet(data, args, cast, field) if (args->type == MY_ARGS_STDARG) { data = va_arg(args->backend.stdarg, cast); } else { data = (cast)args->backend.mystd[args->idx++].field; }
+static inline int32_t       MyArgs_NextI32(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, int32_t);
+    }
+    return args->backend.mystd[args->idx++].i32;
+}
+static inline int64_t       MyArgs_NextI64(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, int64_t);
+    }
+    return args->backend.mystd[args->idx++].i64;
+}
+static inline uint32_t      MyArgs_NextU32(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, uint32_t);
+    }
+    return args->backend.mystd[args->idx++].u32;
+}
+static inline uint64_t      MyArgs_NextU64(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, uint64_t);
+    }
+    return args->backend.mystd[args->idx++].u64;
+}
+static inline double        MyArgs_NextF64(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, double);
+    }
+    return args->backend.mystd[args->idx++].f64;
+}
+static inline void*         MyArgs_NextPtr(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, void*);
+    }
+    return args->backend.mystd[args->idx++].ptr;
+}
+static inline const char*   MyArgs_NextStr(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, const char*);
+    }
+    return args->backend.mystd[args->idx++].str;
+}
+static inline size_t        MyArgs_NextSize(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, size_t);
+    }
+    return args->backend.mystd[args->idx++].size;
+}
+static inline ptrdiff_t     MyArgs_NextDiff(MyArgs* args) {
+    if (args->type == MY_ARGS_STDARG) {
+        return va_arg(args->backend.stdarg, ptrdiff_t);
+    }
+    return args->backend.mystd[args->idx++].diff;
+}
     
 /* Wrappers --------------------------------- */
 
@@ -402,16 +454,16 @@ char* MyLastPathDivisor(char* path);
 #define MY_ANSI_CLEAR_LINE_END      MY_ANSI_ESC "0K"
 #define MY_ANSI_CLEAR_LINE_START    MY_ANSI_ESC "1K"
 
-char* MyAnsiFg256        (uint8_t n);
-char* MyAnsiBg256        (uint8_t n);
-char* MyAnsiFgRGB        (uint8_t r, uint8_t g, uint8_t b);
-char* MyAnsiBgRGB        (uint8_t r, uint8_t g, uint8_t b);
+const char* MyAnsiFg256        (uint8_t n);
+const char* MyAnsiBg256        (uint8_t n);
+const char* MyAnsiFgRGB        (uint8_t r, uint8_t g, uint8_t b);
+const char* MyAnsiBgRGB        (uint8_t r, uint8_t g, uint8_t b);
 
-char* MyAnsiCursorUp     (uint16_t n);
-char* MyAnsiCursorDown   (uint16_t n);
-char* MyAnsiCursorForward(uint16_t n);
-char* MyAnsiCursorBack   (uint16_t n);
-char* MyAnsiCursorPos    (uint16_t x, uint16_t y);
+const char* MyAnsiCursorUp     (uint16_t n);
+const char* MyAnsiCursorDown   (uint16_t n);
+const char* MyAnsiCursorForward(uint16_t n);
+const char* MyAnsiCursorBack   (uint16_t n);
+const char* MyAnsiCursorPos    (uint16_t x, uint16_t y);
 
 /* Printf implementation --------------------------------- */
 

@@ -564,7 +564,7 @@ static inline char* MyAnsiNextBuffer() {
     return myAnsiBuffers[myAnsiIndex];
 }
 
-char* MyAnsiFg256(uint8_t n) {
+const char* MyAnsiFg256(uint8_t n) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -581,7 +581,7 @@ char* MyAnsiFg256(uint8_t n) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiBg256(uint8_t n) {
+const char* MyAnsiBg256(uint8_t n) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -598,7 +598,7 @@ char* MyAnsiBg256(uint8_t n) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
+const char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -621,7 +621,7 @@ char* MyAnsiFgRGB(uint8_t r, uint8_t g, uint8_t b) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
+const char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -645,7 +645,7 @@ char* MyAnsiBgRGB(uint8_t r, uint8_t g, uint8_t b) {
     return start;
 }
 
-char* MyAnsiCursorUp(uint16_t n) {
+const char* MyAnsiCursorUp(uint16_t n) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -657,7 +657,7 @@ char* MyAnsiCursorUp(uint16_t n) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiCursorDown(uint16_t n) {
+const char* MyAnsiCursorDown(uint16_t n) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -669,7 +669,7 @@ char* MyAnsiCursorDown(uint16_t n) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiCursorForward(uint16_t n) {
+const char* MyAnsiCursorForward(uint16_t n) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -681,7 +681,7 @@ char* MyAnsiCursorForward(uint16_t n) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiCursorBack(uint16_t n) {
+const char* MyAnsiCursorBack(uint16_t n) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -693,7 +693,7 @@ char* MyAnsiCursorBack(uint16_t n) {
     *buffer++ = '\0';
     return start;
 }
-char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
+const char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
     char* buffer = MyAnsiNextBuffer();
     char* start = buffer;
     *buffer++ = '\x1b';
@@ -713,67 +713,7 @@ char* MyAnsiCursorPos(uint16_t x, uint16_t y) {
 
 /*
 MyPrintf syntax:
-    %[$ansi][flags][width][.precision][length][specifier]
-
-ansi (optional): 
-    '$' followed by some of the next characters that will indicate the ANSI attribute type
-
-    'C' = CLEAR, has to be followed by one of the next numbers
-        '0' = SCREEN
-        '1' = LINE
-        '2' = TO END
-        '3' = TO START
-        '4' = LINE END
-        '5' = LINE START
-
-    'P' = POSITION / CURSOR, has to be followed by one of the next numbers
-        '0' = UP, must be followed by a single number (n)
-        '1' = DOWN, must be followed by a single number (n)
-        '2' = FORWARD, must be followed by a single number (n)
-        '3' = BACK, must be followed by a single number (n)
-        '4' = POS, must be followed by two numbers (x,y)
-        '5' = HOME
-        '6' = SAVE
-        '7' = RESTORE
-        '8' = HIDE
-        '9' = SHOW
-
-    'S' = STYLE, has to be followed by one of the next numbers
-        '0' = BOLD
-        '1' = DIM
-        '2' = ITALIC
-        '3' = UNDERLINE
-        '4' = BLINK
-        '5' = REVERSE
-        '6' = HIDDEN
-        '7' = STRIKETHROUGH
-        '8' = DOUBLE_UNDER
-        '9' = OVERLINE
-
-    'F' = FOREGROUND, possible values:
-        'black'
-        'red'
-        'green'
-        'yellow'
-        'blue'
-        'magenta'
-        'cyan'
-        'white'
-        one 256 value 
-        three 256 values (separeted by ',')
-
-    'B' = BACKGROUND, possible values:
-        'black'
-        'red'
-        'green'
-        'yellow'
-        'blue'
-        'magenta'
-        'cyan'
-        'white'
-        one 256 value 
-        three 256 values (separeted by ',')
-    
+    %[flags][width][.precision][length][specifier]
 
 flags (optional):
     '-': the result of the conversion is left-justified within the field (by default it is right-justified).
@@ -797,8 +737,11 @@ precision (optional):
     If neither a number nor * is used, the precision is taken as zero.
 
 length (optional):
-    'l': int64_t or uint64_t
-    'z': ptrdiff_t or size_t
+    'hh':   no effect
+    'h':    no effect
+    'l':    int64_t or uint64_t
+    'll':   int64_t or uint64_t
+    'z':    ptrdiff_t or size_t
 
 specifier:
     '%': '%'
@@ -811,6 +754,75 @@ specifier:
     'p': void*
     'n': size_t* (Writes into the provided variable the number of characters written so far by this call to the function.)
 
+MyPrintf ANSI syntax:
+    [specifier][value]
+    or
+    [specifier]: [value]
+
+    when value consist of multiple numbers:
+    [x],[y],[z]
+    or
+    [x], [y], [z]
+
+    each numeric value can be readed of an argument using '*'
+    it is not the case when the value is a string
+
+specifier:
+    'C' = CLEAR
+        '0' = SCREEN
+        '1' = LINE
+        '2' = TO END
+        '3' = TO START
+        '4' = LINE END
+        '5' = LINE START
+
+    'P' = POSITION / CURSOR
+        '0' = UP, must be followed by a single number (n)
+        '1' = DOWN, must be followed by a single number (n)
+        '2' = FORWARD, must be followed by a single number (n)
+        '3' = BACK, must be followed by a single number (n)
+        '4' = POS, must be followed by two numbers (x,y)
+        '5' = HOME
+        '6' = SAVE
+        '7' = RESTORE
+        '8' = HIDE
+        '9' = SHOW
+
+    'S' = STYLE
+        '0' = BOLD
+        '1' = DIM
+        '2' = ITALIC
+        '3' = UNDERLINE
+        '4' = BLINK
+        '5' = REVERSE
+        '6' = HIDDEN
+        '7' = STRIKETHROUGH
+        '8' = DOUBLE_UNDER
+        '9' = OVERLINE
+
+    'F' = FOREGROUND
+        'black'
+        'red'
+        'green'
+        'yellow'
+        'blue'
+        'magenta'
+        'cyan'
+        'white'
+        [256]
+        [r], [g], [b]
+
+    'B' = BACKGROUND, possible values:
+        'black'
+        'red'
+        'green'
+        'yellow'
+        'blue'
+        'magenta'
+        'cyan'
+        'white'
+        [256]
+        [r], [g], [b]
 */
 
 static thread_local char myPrintfBuffers[MY_PRINTF_BUFFER_COUNT][MY_PRINTF_BUFFER_SIZE];
@@ -821,265 +833,242 @@ static inline char* MyPrintfGetBuffer() {
     return myPrintfBuffers[myPrintfIndex];
 }
 
-/* ============================================================
-   Buffer
-   ============================================================ */
-
-typedef struct {
-    char* data;
-    size_t max;
-    size_t written;
-} MyBuffer;
-
-static void MyBuffer_WriteChar(MyBuffer* buffer, char ch, size_t count) {
-    if (buffer->written < buffer->max && buffer->data != NULL) {
-        memset(&buffer->data[buffer->written], ch, MY_MIN(count, buffer->max - buffer->written));
-    }
-    buffer->written += count;
-}
-static void MyBuffer_WriteN(MyBuffer* buffer, const char* src, size_t count) {
-    if (buffer->written < buffer->max && buffer->data != NULL) {
-        memcpy(&buffer->data[buffer->written], src, MY_MIN(count, buffer->max - buffer->written));
-    }
-    buffer->written += count;
-}
-static void MyBuffer_Write(MyBuffer* buffer, const char* src) {
-    MyBuffer_WriteN(buffer, src, strlen(src));
-}
-
-/* ============================================================
-   Format
-   ============================================================ */
-
-typedef struct {
-    const char* text;
-    MyArgs* args;
-} MyFormat;
-
-static bool MyFormat_IsOneOf(MyFormat* format, char* of) {
-    
-}
-static bool MyFormat_AdvanceIfEq(MyFormat* format, char ch) {
-    if (*format->text == ch) {
-        format->text++;
-        return true;
-    }
-    return false;
-}
-static bool MyFormat_ParseNumber(MyFormat* format, int* data) {
-    if (MyFormat_AdvanceIfEq(format, '*')) {
-        MyArgsGet(*data, format->args, int32_t, i32);
-        return true;
-    }
-
-    bool readed = isdigit(*format->text);
-    while(isdigit(*format->text)) {
-        *data = *data * 10 + (*format->text - '0'); 
-        format->text++;
-    }
-    return readed;
-}
-static bool MyFormat_ParseNextNumber(MyFormat* format, int* data) {
-    if (MyFormat_AdvanceIfEq(format, ',')) {
-        MyFormat_AdvanceIfEq(format, ' ');
-        MyFormat_ParseNumber(format, data);
-        return true;
-    }
-
-    return false;
-}
-
-/* ============================================================
-   Printf Spec
-   ============================================================ */
-
 typedef struct {
     bool        plus;
     bool        minus;
     bool        space;
-
     int         width;
     int         precision;
     bool        setWidth;
     bool        setPrecision;
-
     bool        lengthL;
     bool        lengthZ;
-
-    char        temp;
-    const char* data;
+    char        ch;
+    const char* str;
     size_t      length;
 } MyPrintfSpec;
+typedef struct {
+    char*           buffer;
+    size_t          max;
+    size_t          written;
 
-static void MyPrintfSpec_ParseFlags(MyPrintfSpec* spec, MyFormat* format) {
-    while (true) {
-        if (MyFormat_AdvanceIfEq(format, '+')) { spec->plus = true; }
-        else if (MyFormat_AdvanceIfEq(format, '-')) { spec->minus = true; }
-        else if (MyFormat_AdvanceIfEq(format, ' ')) { spec->space = true; }
-        else { break; }
-    }
-    if (spec->plus) { spec->space = false; }
-}
-static void MyPrintfSpec_ParseWidth(MyPrintfSpec* spec, MyFormat* format) {
-    spec->setWidth = MyFormat_ParseNumber(format, &spec->width);
-}
-static void MyPrintfSpec_ParsePrecision(MyPrintfSpec* spec, MyFormat* format) {
-    if (MyFormat_AdvanceIfEq(format, '.')) {
-        spec->setPrecision = true;
-        MyFormat_ParseNumber(format, &spec->precision);
-    }
-}
-static void MyPrintfSpec_ParseLenght(MyPrintfSpec* spec, MyFormat* format) {
-    if (MyFormat_AdvanceIfEq(format, 'z')) {
-        spec->lengthZ = true;
-        return;
-    }
+    MyArgs*         args;
+    const char*     format;
 
-    if (MyFormat_AdvanceIfEq(format, 'l')) {
-        MyFormat_AdvanceIfEq(format, 'l');
-        spec->lengthL = true;
-        return;
-    }
+    MyPrintfSpec    spec;
+} MyPrintfData;
 
-    MyFormat_AdvanceIfEq(format, 'h');
-    MyFormat_AdvanceIfEq(format, 'h');
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+static void MyPrintf_WriteChar(MyPrintfData* data, char ch, size_t count) {
+    if (data->written < data->max && data->buffer != NULL) {
+        memset(&data->buffer[data->written], ch, MY_MIN(count, data->max - data->written));
+    }
+    data->written += count;
+}
+static void MyPrintf_WriteN(MyPrintfData* data, const char* src, size_t count) {
+    if (data->written < data->max && data->buffer != NULL) {
+        memcpy(&data->buffer[data->written], src, MY_MIN(count, data->max - data->written));
+    }
+    data->written += count;
+}
+static void MyPrintf_Write(MyPrintfData* data, const char* src) {
+    MyPrintf_WriteN(data, src, strlen(src));
 }
 
-static void MyPrintfSpec_ParsePP(MyPrintfSpec* spec, MyFormat* format) {
-    spec->temp = '%';
-    spec->data = &spec->temp;
-    spec->length = 1;
-}
-static void MyPrintfSpec_ParseC(MyPrintfSpec* spec, MyFormat* format) {
-    MyArgsGet(spec->temp, format->args, int32_t, i32);
-    spec->data = &spec->temp;
-    spec->length = 1;
-}
-static void MyPrintfSpec_ParseS(MyPrintfSpec* spec, MyFormat* format) {
-    MyArgsGet(spec->data, format->args, const char*, str);
-    if (!spec->data) { spec->data = "(null)"; }
-    spec->length = strlen(spec->data);
-    if (spec->setPrecision && spec->length > spec->precision) { spec->length = spec->precision; }
-}
-static void MyPrintfSpec_ParseI(MyPrintfSpec* spec, MyFormat* format) {
-    if (spec->lengthZ) {
-        ptrdiff_t value = 0;
-        MyArgsGet(value, format->args, ptrdiff_t, dif);
-        spec->data = MyPtrdifftos(value);
-        spec->length = strlen(spec->data);
-        return;
+static bool MyPrintf_AdvanceIfEq(MyPrintfData* data, char ch) {
+    if (*data->format == ch) {
+        data->format++;
+        return true;
     }
-    
-    if (spec->lengthL) {
-        int64_t value = 0;
-        MyArgsGet(value, format->args, int64_t, i64);
-        spec->data = MyI64tos(value, spec->plus, spec->space);
-        spec->length = strlen(spec->data);
-        return;
-    } 
-    
-    int32_t value = 0;
-    MyArgsGet(value, format->args, int32_t, i32);
-    spec->data = MyI32tos(value, spec->plus, spec->space);
-    spec->length = strlen(spec->data);
+    return false;
 }
-static void MyPrintfSpec_ParseU(MyPrintfSpec* spec, MyFormat* format) {
-    if (spec->lengthZ) {
-        size_t value = 0;
-        MyArgsGet(value, format->args, size_t, sze);
-        spec->data = MySizetos(value);
-        spec->length = strlen(spec->data);
-        return;
-    }
-    
-    if (spec->lengthL) {
-        uint64_t value = 0;
-        MyArgsGet(value, format->args, uint64_t, u64);
-        spec->data = MyU64tos(value, spec->plus, spec->space);
-        spec->length = strlen(spec->data);
-        return;
+static bool MyPrintf_ParseNumber(MyPrintfData* data, int* value) {
+    if (MyPrintf_AdvanceIfEq(data, '*')) {
+        *value = MyArgs_NextI32(data->args);
+        return true;
     }
 
-    uint32_t value = 0;
-    MyArgsGet(value, format->args, uint32_t, i32);
-    spec->data = MyU32tos(value, spec->plus, spec->space);
-    spec->length = strlen(spec->data);
-}
-static void MyPrintfSpec_ParseX(MyPrintfSpec* spec, MyFormat* format) {
-    if (spec->lengthL) {
-        uint64_t value = 0;
-        MyArgsGet(value, format->args, uint64_t, i64);
-        spec->data = MyX64tos(value);
-        spec->length = strlen(spec->data);
-        return;
+    if (!isdigit(*data->format)) { return false; }
+
+    while(isdigit(*data->format)) {
+        *value = *value * 10 + (*data->format - '0'); 
+        data->format++;
     }
-    
-    uint32_t value = 0;
-    MyArgsGet(value, format->args, uint32_t, i32);
-    spec->data = MyX32tos(value);
-    spec->length = strlen(spec->data);
+    return true;
 }
-static void MyPrintfSpec_ParseF(MyPrintfSpec* spec, MyFormat* format) {
-    double value = 0;
-    MyArgsGet(value, format->args, double, f64);
-    spec->data = MyF64tos(value, MY_TERNARY(spec->setPrecision, spec->precision, 1), spec->plus, spec->space);
-    spec->length = strlen(spec->data);
-}
-static void MyPrintfSpec_ParseP(MyPrintfSpec* spec, MyFormat* format) {
-    void* value = 0;
-    MyArgsGet(value, format->args, void*, ptr);
-    spec->data = MyPtrtos(value);
-    spec->length = strlen(spec->data);
-}
-static void (*myPrintfSpecParsers[256])(MyPrintfSpec*, MyFormat*) = {
-    [0 ... 255] = NULL,
-    ['%'] = MyPrintfSpec_ParsePP,
-    ['c'] = MyPrintfSpec_ParseC,
-    ['s'] = MyPrintfSpec_ParseS,
-    ['i'] = MyPrintfSpec_ParseI,
-    ['u'] = MyPrintfSpec_ParseU,
-    ['x'] = MyPrintfSpec_ParseX,
-    ['f'] = MyPrintfSpec_ParseF,
-    ['p'] = MyPrintfSpec_ParseP,
-};
-
-void MyPrintfSpec_Parse(MyPrintfSpec* spec, MyFormat* format, MyBuffer* buffer) {
-    MyPrintfSpec_ParseFlags(spec, format);
-    MyPrintfSpec_ParseWidth(spec, format);
-    MyPrintfSpec_ParsePrecision(spec, format);
-    MyPrintfSpec_ParseLenght(spec, format);
-
-    if (MyFormat_AdvanceIfEq(format, 'n')) {
-        size_t* n = NULL;
-        MyArgsGet(n, format->args, size_t*, ptr);
-        *n = buffer->written;
-        return;
+static bool MyPrintf_ParseNextNumber(MyPrintfData* data, int* value) {
+    if (MyPrintf_AdvanceIfEq(data, ',')) {
+        MyPrintf_AdvanceIfEq(data, ' ');
+        MyPrintf_ParseNextNumber(data, value);
+        return true;
     }
 
-    void (*parser)(MyPrintfSpec*, MyFormat*) = myPrintfSpecParsers[tolower(*format->text++)];
-    if (!parser) { return; }
-
-    parser(spec, format);
-
-    if (spec->setWidth && spec->length < spec->width && !spec->minus) { 
-        // Left Padding
-        MyBuffer_WriteChar(buffer, ' ', spec->width - spec->length); 
-    }
-
-    // Write parsed content
-    MyBuffer_WriteN(buffer, spec->data, spec->length);
-
-    if (spec->setWidth && spec->length < spec->width && spec->minus) { 
-        // Right Padding
-        MyBuffer_WriteChar(buffer, ' ', spec->width - spec->length); 
-    }
+    return false;
 }
 
 /* ============================================================
-   ANSI
+   Format Parsing
    ============================================================ */
 
-static const char* myAnsiFgColors[256] = {
+static void MyPrintf_ParsePP(MyPrintfData* data) {
+    data->spec.ch = '%';
+    data->spec.str = &data->spec.ch;
+    data->spec.length = 1;
+}
+static void MyPrintf_ParseC(MyPrintfData* data) {
+    data->spec.ch = MyArgs_NextI32(data->args);
+    data->spec.str = &data->spec.ch;
+    data->spec.length = 1;
+}
+static void MyPrintf_ParseS(MyPrintfData* data) {
+    data->spec.str = MyArgs_NextStr(data->args);
+    if (!data->spec.str) { data->spec.str = "(null)"; }
+    data->spec.length = strlen(data->spec.str);
+    if (data->spec.setPrecision && data->spec.length > data->spec.precision) { data->spec.length = data->spec.precision; }
+}
+static void MyPrintf_ParseI(MyPrintfData* data) {
+    if (data->spec.lengthZ) {
+        ptrdiff_t value = MyArgs_NextDiff(data->args);
+        data->spec.str = MyPtrdifftos(value);
+        data->spec.length = strlen(data->spec.str);
+        return;
+    }
+    
+    if (data->spec.lengthL) {
+        int64_t value = MyArgs_NextI64(data->args);
+        data->spec.str = MyI64tos(value, data->spec.plus, data->spec.space);
+        data->spec.length = strlen(data->spec.str);
+        return;
+    } 
+    
+    int32_t value = MyArgs_NextI32(data->args);
+    data->spec.str = MyI32tos(value, data->spec.plus, data->spec.space);
+    data->spec.length = strlen(data->spec.str);
+}
+static void MyPrintf_ParseU(MyPrintfData* data) {
+    if (data->spec.lengthZ) {
+        size_t value = MyArgs_NextSize(data->args);
+        data->spec.str = MySizetos(value);
+        data->spec.length = strlen(data->spec.str);
+        return;
+    }
+    
+    if (data->spec.lengthL) {
+        uint64_t value = MyArgs_NextU64(data->args);
+        data->spec.str = MyU64tos(value, data->spec.plus, data->spec.space);
+        data->spec.length = strlen(data->spec.str);
+        return;
+    } 
+    
+    uint32_t value = MyArgs_NextU32(data->args);
+    data->spec.str = MyU32tos(value, data->spec.plus, data->spec.space);
+    data->spec.length = strlen(data->spec.str);
+}
+static void MyPrintf_ParseX(MyPrintfData* data) {
+    if (data->spec.lengthL) {
+        uint64_t value = MyArgs_NextU64(data->args);
+        data->spec.str = MyX64tos(value);
+        data->spec.length = strlen(data->spec.str);
+        return;
+    } 
+    
+    uint32_t value = MyArgs_NextU32(data->args);
+    data->spec.str = MyX32tos(value);
+    data->spec.length = strlen(data->spec.str);
+}
+static void MyPrintf_ParseF(MyPrintfData* data) {
+    if (!data->spec.setPrecision) { data->spec.precision = 1; }
+    double value = MyArgs_NextF64(data->args);
+    data->spec.str = MyF64tos(value, data->spec.precision, data->spec.plus, data->spec.space);
+    data->spec.length = strlen(data->spec.str);
+}
+static void MyPrintf_ParseP(MyPrintfData* data) {
+    void* value = MyArgs_NextPtr(data->args);
+    data->spec.str = MyPtrtos(value);
+    data->spec.length = strlen(data->spec.str);
+}
+static void (*myPrintfSpecParsers[256])(MyPrintfData*) = {
+    [0 ... 255] = NULL,
+    ['%'] = MyPrintf_ParsePP,
+    ['c'] = MyPrintf_ParseC,
+    ['s'] = MyPrintf_ParseS,
+    ['i'] = MyPrintf_ParseI,
+    ['u'] = MyPrintf_ParseU,
+    ['x'] = MyPrintf_ParseX,
+    ['f'] = MyPrintf_ParseF,
+    ['p'] = MyPrintf_ParseP,
+};
+
+static void MyPrintfSpec_Parse(MyPrintfData* data) {
+    /*  
+        Parse Flags
+    */
+    while (true) {
+        if (MyPrintf_AdvanceIfEq(data, '+')) { data->spec.plus = true; }
+        else if (MyPrintf_AdvanceIfEq(data, '-')) { data->spec.minus = true; }
+        else if (MyPrintf_AdvanceIfEq(data, ' ')) { data->spec.space = true; }
+        else { break; }
+    }
+    if (data->spec.plus) { data->spec.space = false; }
+
+    /*  
+        Parse Width
+    */
+    data->spec.setWidth = MyPrintf_ParseNumber(data, &data->spec.width);
+
+    /*  
+        Parse Precision
+    */
+    if (MyPrintf_AdvanceIfEq(data, '.')) {
+        data->spec.setPrecision = true;
+        MyPrintf_ParseNumber(data, &data->spec.precision);
+    }
+
+    /*  
+        Parse Precision
+    */
+    if (MyPrintf_AdvanceIfEq(data, 'z')) {
+        data->spec.lengthZ = true;
+        return;
+    }
+    if (MyPrintf_AdvanceIfEq(data, 'l')) {
+        MyPrintf_AdvanceIfEq(data, 'l');
+        data->spec.lengthL = true;
+        return;
+    }
+    MyPrintf_AdvanceIfEq(data, 'h');
+    MyPrintf_AdvanceIfEq(data, 'h');
+
+    /*  
+        Parse Specifier
+    */
+    if (MyPrintf_AdvanceIfEq(data, 'n')) {
+        size_t* n = (size_t*)MyArgs_NextPtr(data->args);
+        *n = data->written;
+        return;
+    }
+    void (*parser)(MyPrintfData*) = myPrintfSpecParsers[tolower(*data->format++)];
+    if (!parser) { return; }
+    parser(data);
+
+    /*  
+        Left pad will we applied if !data->spec.minus
+        Write Parsed content
+        Right pad will we applied if data->spec.minus
+    */
+    if (data->spec.setWidth && data->spec.length < data->spec.width && !data->spec.minus) { MyPrintf_WriteChar(data, ' ', data->spec.width - data->spec.length); }
+    MyPrintf_WriteN(data, data->spec.str, data->spec.length);
+    if (data->spec.setWidth && data->spec.length < data->spec.width && data->spec.minus) { MyPrintf_WriteChar(data, ' ', data->spec.width - data->spec.length); }
+}
+
+/* ============================================================
+   ANSI Parsing
+   ============================================================ */
+
+static const char* myPrintfFgColors[256] = {
     [0 ... 255] = NULL,
     ['k'] = MY_ANSI_FG_BLACK,
     ['r'] = MY_ANSI_FG_RED,
@@ -1090,7 +1079,7 @@ static const char* myAnsiFgColors[256] = {
     ['c'] = MY_ANSI_FG_CYAN,
     ['w'] = MY_ANSI_FG_WHITE,
 };
-static const char* myAnsiBgColors[256] = {
+static const char* myPrintfBgColors[256] = {
     [0 ... 255] = NULL,
     ['k'] = MY_ANSI_BG_BLACK,
     ['r'] = MY_ANSI_BG_RED,
@@ -1101,7 +1090,7 @@ static const char* myAnsiBgColors[256] = {
     ['c'] = MY_ANSI_BG_CYAN,
     ['w'] = MY_ANSI_BG_WHITE,
 };
-static const char* myAnsiStyles[10] = {
+static const char* myPrintfStyles[10] = {
     MY_ANSI_BOLD,
     MY_ANSI_DIM,
     MY_ANSI_ITALIC,
@@ -1113,7 +1102,7 @@ static const char* myAnsiStyles[10] = {
     MY_ANSI_DOUBLE_UNDER,
     MY_ANSI_OVERLINE
 };
-static const char* myAnsiClears[6] = {
+static const char* myPrintfClears[6] = {
     MY_ANSI_CLEAR_SCREEN,
     MY_ANSI_CLEAR_LINE,
     MY_ANSI_CLEAR_TO_END,
@@ -1121,7 +1110,7 @@ static const char* myAnsiClears[6] = {
     MY_ANSI_CLEAR_LINE_END,
     MY_ANSI_CLEAR_LINE_START,
 };
-static const char* myAnsiCursors[10] = {
+static const char* myPrintfCursors[10] = {
     NULL,
     NULL,
     NULL,
@@ -1133,7 +1122,7 @@ static const char* myAnsiCursors[10] = {
     MY_ANSI_CURSOR_HIDE,
     MY_ANSI_CURSOR_SHOW
 };
-static char* (*myPrintfCursorsX[10])(uint16_t) = {
+static const char* (*myPrintfCursorsX[10])(uint16_t) = {
     MyAnsiCursorUp,
     MyAnsiCursorDown,
     MyAnsiCursorForward,
@@ -1146,41 +1135,41 @@ static char* (*myPrintfCursorsX[10])(uint16_t) = {
     NULL,
 };
 
-static void MyAnsi_ParseC(MyPrintfSpec* spec, MyFormat* format) {
+static void MyPrintf_AnsiParseC(MyPrintfData* data) {
     int idx = 0;
-    MyFormat_ParseNumber(format, &idx);
-    spec->data = myAnsiClears[idx % 6];
+    MyPrintf_ParseNumber(data, &idx);
+    data->spec.str = myPrintfClears[idx % 6];
 }
-static void MyAnsi_ParseP(MyPrintfSpec* spec, MyFormat* format) {
+static void MyPrintf_AnsiParseP(MyPrintfData* data) {
     int x = 0;
     int y = 0;
     int idx = 0;
-    MyFormat_ParseNumber(format, &idx);
+    MyPrintf_ParseNumber(data, &idx);
     idx = idx % 10;
 
     if (idx > 4) {
-        spec->data = myAnsiCursors[idx];
+        data->spec.str = myPrintfCursors[idx];
         return;
     }
 
-    MyFormat_ParseNumber(format, &x);
+    MyPrintf_ParseNumber(data, &x);
     if (idx < 4) {
-        spec->data = myPrintfCursorsX[idx]((uint16_t)x);
+        data->spec.str = myPrintfCursorsX[idx]((uint16_t)x);
         return;
     }
 
-    MyFormat_ParseNextNumber(format, &y);
-    spec->data = MyAnsiCursorPos((uint16_t)x, (uint16_t)y);
+    MyPrintf_ParseNextNumber(data, &y);
+    data->spec.str = MyAnsiCursorPos((uint16_t)x, (uint16_t)y);
 }
-static void MyAnsi_ParseS(MyPrintfSpec* spec, MyFormat* format) {
+static void MyPrintf_AnsiParseS(MyPrintfData* data) {
     int idx = 0;
-    MyFormat_ParseNumber(format, &idx);
-    spec->data = myAnsiStyles[idx % 10];
+    MyPrintf_ParseNumber(data, &idx);
+    data->spec.str = myPrintfStyles[idx % 10];
 }
-static void MyAnsi_ParseF(MyPrintfSpec* spec, MyFormat* format) {
-    spec->data = myAnsiFgColors[*format->text];
-    if (spec->data) { 
-        format->text++;
+static void MyPrintf_AnsiParseF(MyPrintfData* data) {
+    data->spec.str = myPrintfFgColors[*data->format];
+    if (data->spec.str) { 
+        data->format++;
         return;
     }
 
@@ -1188,19 +1177,19 @@ static void MyAnsi_ParseF(MyPrintfSpec* spec, MyFormat* format) {
     int g = 0;
     int b = 0;
 
-    MyFormat_ParseNumber(format, &r);
-    if (!MyFormat_ParseNextNumber(format, &g)) {
-        spec->data = MyAnsiFg256((uint8_t)r);
+    MyPrintf_ParseNumber(data, &r);
+    if (!MyPrintf_ParseNextNumber(data, &g)) {
+        data->spec.str = MyAnsiFg256((uint8_t)r);
         return;
     }
 
-    MyFormat_ParseNextNumber(format, &b);
-    spec->data = MyAnsiFgRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
+    MyPrintf_ParseNextNumber(data, &b);
+    data->spec.str = MyAnsiFgRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
 }
-static void MyAnsi_ParseB(MyPrintfSpec* spec, MyFormat* format) {
-    spec->data = myAnsiBgColors[*format->text];
-    if (spec->data) { 
-        format->text++;
+static void MyPrintf_AnsiParseB(MyPrintfData* data) {
+    data->spec.str = myPrintfBgColors[*data->format];
+    if (data->spec.str) { 
+        data->format++;
         return;
     }
 
@@ -1208,43 +1197,43 @@ static void MyAnsi_ParseB(MyPrintfSpec* spec, MyFormat* format) {
     int g = 0;
     int b = 0;
 
-    MyFormat_ParseNumber(format, &r);
-    if (!MyFormat_ParseNextNumber(format, &g)) {
-        spec->data = MyAnsiBg256((uint8_t)r);
+    MyPrintf_ParseNumber(data, &r);
+    if (!MyPrintf_ParseNextNumber(data, &g)) {
+        data->spec.str = MyAnsiBg256((uint8_t)r);
         return;
     }
 
-    MyFormat_ParseNextNumber(format, &b);
-    spec->data = MyAnsiBgRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
+    MyPrintf_ParseNextNumber(data, &b);
+    data->spec.str = MyAnsiBgRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
 }
-static void (*myAnsiParsers[256])(MyPrintfSpec*, MyFormat*) = {
+static void (*myPrintfAnsiParsers[256])(MyPrintfData*) = {
     [0 ... 255] = NULL,
-    ['C'] = MyAnsi_ParseC,
-    ['P'] = MyAnsi_ParseP,
-    ['S'] = MyAnsi_ParseS,
-    ['F'] = MyAnsi_ParseF,
-    ['B'] = MyAnsi_ParseB
+    ['C'] = MyPrintf_AnsiParseC,
+    ['P'] = MyPrintf_AnsiParseP,
+    ['S'] = MyPrintf_AnsiParseS,
+    ['F'] = MyPrintf_AnsiParseF,
+    ['B'] = MyPrintf_AnsiParseB
 };
-static bool myAnsiParsersReset[256] = {
+static bool myPrintfAnsiParsersReset[256] = {
     [0 ... 255] = false,
     ['S'] = true,
     ['F'] = true,
     ['B'] = true
 };
 
-static bool MyAnsi_Parse(MyPrintfSpec* spec, MyBuffer* buffer, MyFormat* format) {
-    if (!format->text) { return false; }
+static bool MyPrintf_AnsiParse(MyPrintfData* data) {
+    if (!data->format) { return false; }
     
     bool reset = false;
-    while (*format->text) {
-        char key = *format->text++;
-        void (*parser)(MyPrintfSpec*, MyFormat*) = myAnsiParsers[key];
+    while (*data->format) {
+        char key = *data->format++;
+        void (*parser)(MyPrintfData*) = myPrintfAnsiParsers[key];
         if (parser == NULL) { continue; }
-        MyFormat_AdvanceIfEq(format, ':');
-        MyFormat_AdvanceIfEq(format, ' ');
-        parser(spec, format);
-        MyBuffer_Write(buffer, spec->data);
-        if (myAnsiParsersReset[key]) { reset = true; }
+        MyPrintf_AdvanceIfEq(data, ':');
+        MyPrintf_AdvanceIfEq(data, ' ');
+        parser(data);
+        MyPrintf_Write(data, data->spec.str);
+        if (myPrintfAnsiParsersReset[key]) { reset = true; }
     }
     return reset;
 }
@@ -1291,38 +1280,35 @@ size_t      MySnprintf(char* buffer, size_t max, const char* format, ...) {
     return written;
 }
 size_t      MyVsnprintf(char* buffer, size_t max, const char* format, va_list args) {
-    MyBuffer buf = {0};
-    buf.max = max - 1;
-    buf.data = buffer;
-    buf.written = 0;
+    MyArgs myArgs = {0};
+    myArgs.type = MY_ARGS_STDARG;
+    myArgs.backend.stdarg = args;
 
-    MyArgs arg = {0};
-    arg.type = MY_ARGS_STDARG;
-    arg.backend.stdarg = args;
-
-    MyFormat fmt = {0};
-    fmt.text = format;
-    fmt.args = &arg;
+    MyPrintfData data = {0};
+    data.max = max - 1;
+    data.buffer = buffer;
+    data.format = format;
+    data.args = &myArgs;
 
     while (true) {
-        MyPrintfSpec spec = {0};
+        data.spec = (MyPrintfSpec){0};
         
-        const char* percentage = strchr(fmt.text, '%');
+        const char* percentage = strchr(data.format, '%');
         if (percentage == NULL) { 
-            MyBuffer_Write(&buf, fmt.text);
+            MyPrintf_Write(&data, data.format);
             break;
         }
 
-        if (percentage != fmt.text) {
-            MyBuffer_WriteN(&buf, fmt.text, MY_PTR_DIF(percentage, fmt.text));
+        if (percentage != data.format) {
+            MyPrintf_WriteN(&data, data.format, MY_PTR_DIF(percentage, data.format));
         }
 
-        fmt.text = percentage + 1;
-        MyPrintfSpec_Parse(&spec, &fmt, &buf);
+        data.format = percentage + 1;
+        MyPrintfSpec_Parse(&data);
     }
 
-    if (buf.data) { buf.data[MY_MIN(buf.written, buf.max)] = '\0'; }
-    return buf.written;
+    if (data.buffer) { data.buffer[MY_MIN(data.written, data.max)] = '\0'; }
+    return data.written;
 }
 
 /* ============================================================
@@ -1341,46 +1327,44 @@ const char* MySprintfSegmentsN(MyPrintfSegment* segments, size_t count) {
     return buffer;
 }
 size_t      MySnprintfSegmentsN(char* buffer, size_t max, MyPrintfSegment* segments, size_t count) {
-    MyBuffer buf = {0};
-    buf.max = max - 1;
-    buf.data = buffer;
+    MyPrintfData data = {0};
+    data.max = max - 1;
+    data.buffer = buffer;
 
     for (size_t i = 0; i < count; i++) {
-        MyPrintfSpec spec = {0};
+        MyArgs myArgs = {0};
+        myArgs.type = MY_ARGS_MYSTD;
+        myArgs.backend.mystd = segments[i].args;
 
-        MyArgs arg = {0};
-        arg.type = MY_ARGS_MYSTD;
-        arg.backend.mystd = segments[i].args;
-
-        MyFormat fmt = {0};
-        fmt.args = &arg;
+        data.args = &myArgs;
+        data.spec = (MyPrintfSpec){0};
         
-        fmt.text = segments[i].ansi;
-        bool reset = MyAnsi_Parse(&spec, &buf, &fmt);
+        data.format = segments[i].ansi;
+        bool reset = MyPrintf_AnsiParse(&data);
 
-        fmt.text = segments[i].format;
+        data.format = segments[i].format;
         while (true) {
-            spec = (MyPrintfSpec){0};
-
-            const char* percentage = strchr(fmt.text, '%');
+            data.spec = (MyPrintfSpec){0};
+            
+            const char* percentage = strchr(data.format, '%');
             if (percentage == NULL) { 
-                MyBuffer_Write(&buf, fmt.text);
+                MyPrintf_Write(&data, data.format);
                 break;
             }
 
-            if (percentage != fmt.text) {
-                MyBuffer_WriteN(&buf, fmt.text, MY_PTR_DIF(percentage, fmt.text));
+            if (percentage != data.format) {
+                MyPrintf_WriteN(&data, data.format, MY_PTR_DIF(percentage, data.format));
             }
 
-            fmt.text = percentage + 1;
-            MyPrintfSpec_Parse(&spec, &fmt, &buf);
+            data.format = percentage + 1;
+            MyPrintfSpec_Parse(&data);
         }
 
-        if (reset) { MyBuffer_Write(&buf, MY_ANSI_RESET); }
+        if (reset) { MyPrintf_Write(&data, MY_ANSI_RESET); }
     }
 
-    if (buf.data) { buf.data[MY_MIN(buf.written, buf.max)] = '\0'; }
-    return buf.written;
+    if (data.buffer) { data.buffer[MY_MIN(data.written, data.max)] = '\0'; }
+    return data.written;
 }
 
 /* LOG System ---------------------------- */

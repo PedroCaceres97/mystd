@@ -66,10 +66,10 @@ void                  MY_SLAB_FN_DUMP           (MY_SLAB_STRUCT* slab, MyFile* f
 struct MY_SLAB_BLOCK_STRUCT {
     MY_SLAB_DATA_TYPE               mem[MY_SLAB_OBJECTS_COUNT];
     MY_SLAB_DATA_TYPE*              free_stack[MY_SLAB_OBJECTS_COUNT];
-    bool                           allocated_table[MY_SLAB_OBJECTS_COUNT];
+    bool                            allocated_table[MY_SLAB_OBJECTS_COUNT];
     struct MY_SLAB_BLOCK_STRUCT*    next;
     size_t                          free_count;
-    bool                           allocated;
+    bool                            allocated;
 };
 
 struct MY_SLAB_STRUCT {

@@ -50,7 +50,6 @@
     #define MY_CPU_UNKNOWN
 #endif
 
-/* Pointer Size ----------------------------------------------------------- */
 #if UINTPTR_MAX == UINT64_MAX
     #define MY_PTR_64BIT
 #elif UINTPTR_MAX == UINT32_MAX
@@ -59,7 +58,6 @@
     #define MY_PTR_UNKOWN
 #endif
 
-/* size_t Size ----------------------------------------------------------- */
 #if (SIZE_MAX == UINT64_MAX)
     #define MY_SIZE_64BIT
 #elif (SIZE_MAX == UINT32_MAX)
@@ -68,7 +66,6 @@
     #define MY_SIZE_UNKOWN
 #endif
 
-/* ptrdiff_t Size ----------------------------------------------------------- */
 #if (PTRDIFF_MAX == INT64_MAX)
     #define MY_PTRDIFF_64BIT
 #elif (PTRDIFF_MAX == INT32_MAX)
@@ -115,16 +112,20 @@ typedef struct MyContext {
 #define MY_CONTEXT_ALIAS(alias) ((MyContext){(alias), MY_FILE_PATH, __func__, __LINE__})
 
 #ifndef MY_CONTEXT_COLOR
-    #define MY_CONTEXT_COLOR 244
+    #define MY_CONTEXT_COLOR 189
 #endif
 #ifndef MY_MESSAGE_COLOR
     #define MY_MESSAGE_COLOR 207
 #endif
-#ifndef MY_CONTEXT_LABEL
-    #define MY_CONTEXT_LABEL "Context"
+
+#ifndef MY_LABEL_COLOR
+    #define MY_LABEL_COLOR 244
 #endif
-#ifndef MY_MESSAGE_LABEL
-    #define MY_MESSAGE_LABEL "Message"
+#ifndef MY_LABEL_CONTEXT
+    #define MY_LABEL_CONTEXT "Context"
+#endif
+#ifndef MY_LABEL_MESSAGE
+    #define MY_LABEL_MESSAGE "Message"
 #endif
 
 /* RWLOCK ----------------------------------------------------------------- */
@@ -508,41 +509,45 @@ MY_NORETURN void MyExit();
 #endif
 
 #ifndef MY_INFO_COLOR
-    #define MY_INFO_COLOR      MY_ANSI_FG_256(212)
+    #define MY_INFO_COLOR      212
 #endif
-#ifndef MY_DEBUG_COLOR
-    #define MY_DEBUG_COLOR     MY_ANSI_FG_256(87)
-#endif
-#ifndef MY_SUCCESS_COLOR
-    #define MY_SUCCESS_COLOR   MY_ANSI_FG_256(46)
-#endif
-#ifndef MY_WARNING_COLOR
-    #define MY_WARNING_COLOR   MY_ANSI_FG_256(214)
-#endif
-#ifndef MY_ERROR_COLOR
-    #define MY_ERROR_COLOR     MY_ANSI_FG_256(196)
-#endif
-#ifndef MY_FATAL_COLOR
-    #define MY_FATAL_COLOR     MY_ANSI_FG_256(165)
+#ifndef MY_INFO_TITLE
+    #define MY_INFO_TITLE       "[INFO]"
 #endif
 
-#ifndef MY_INFO_TITLE
-    #define MY_INFO_TITLE       MY_ANSI_TEXT(MY_INFO_COLOR, "[INFO]")
+#ifndef MY_DEBUG_COLOR
+    #define MY_DEBUG_COLOR     87
 #endif
 #ifndef MY_DEBUG_TITLE
-    #define MY_DEBUG_TITLE      MY_ANSI_TEXT(MY_DEBUG_COLOR, "[DEBUG]")
+    #define MY_DEBUG_TITLE      "[DEBUG]"
+#endif
+
+#ifndef MY_SUCCESS_COLOR
+    #define MY_SUCCESS_COLOR   46
 #endif
 #ifndef MY_SUCCESS_TITLE
-    #define MY_SUCCESS_TITLE    MY_ANSI_TEXT(MY_SUCCESS_COLOR, "[SUCCESS]")
+    #define MY_SUCCESS_TITLE    "[SUCCESS]"
+#endif
+
+#ifndef MY_WARNING_COLOR
+    #define MY_WARNING_COLOR   214
 #endif
 #ifndef MY_WARNING_TITLE
-    #define MY_WARNING_TITLE    MY_ANSI_TEXT(MY_WARNING_COLOR, "[WARNING]")
+    #define MY_WARNING_TITLE    "[WARNING]"
+#endif
+
+#ifndef MY_ERROR_COLOR
+    #define MY_ERROR_COLOR     196
 #endif
 #ifndef MY_ERROR_TITLE
-    #define MY_ERROR_TITLE      MY_ANSI_TEXT(MY_ERROR_COLOR, "[ERROR]")
+    #define MY_ERROR_TITLE      "[ERROR]"
+#endif
+
+#ifndef MY_FATAL_COLOR
+    #define MY_FATAL_COLOR     165
 #endif
 #ifndef MY_FATAL_TITLE 
-    #define MY_FATAL_TITLE      MY_ANSI_TEXT(MY_FATAL_COLOR, "[FATAL]")
+    #define MY_FATAL_TITLE      "[FATAL]"
 #endif
 
 typedef enum {
@@ -559,7 +564,7 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg);
 
 #define MY_ASSERT(cnd, format, ...)              do { if (!(cnd))            { MyLog(MY_FATAL, format, ##__VA_ARGS__);                                                  } } while(0)
 #define MY_ASSERT_PTR(ptr)                       do { if ((ptr) == NULL)     { MyLog(MY_FATAL, "'"#ptr "' is NULL");                                                    } } while(0)
-#define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyLog(MY_FATAL, "Index (%zu) out of Bounds (%zu)", idx, bound)                           } } while(0)
+#define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyLog(MY_FATAL, "Index (%zu) out of Bounds (%zu)", idx, bound);                          } } while(0)
 #define MY_ASSERT_MALLOC(ptr, type, size)        do { if (ptr == NULL)       { MyLog(MY_FATAL, "Malloc failed for "  #ptr " of type " #type " and size %zu",  size);    } } while(0)
 #define MY_ASSERT_CALLOC(ptr, type, count)       do { if (ptr == NULL)       { MyLog(MY_FATAL, "Calloc failed for "  #ptr " of type " #type " and count %zu", count);   } } while(0)
 #define MY_ASSERT_REALLOC(ptr, type, size)       do { if (ptr == NULL)       { MyLog(MY_FATAL, "Realloc failed for " #ptr " of type " #type " and size %zu",  size);    } } while(0)

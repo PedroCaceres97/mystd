@@ -14,15 +14,6 @@ extern "C" {
     #define MY_ASSERT_WINBOOL(x) MY_ASSERT_WIN(x != 0)
     #define MY_ASSERT_WINHANDLE(x) MY_ASSERT_WIN((x) != INVALID_HANDLE_VALUE && (x) != NULL)
 
-    static void MyOutput(const char* msg) {
-        DWORD written = 0;
-        WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), msg, strlen(msg), &written, NULL);
-    }
-    static void MyError(const char* msg) {
-        DWORD written = 0;
-        WriteFile(GetStdHandle(STD_ERROR_HANDLE), msg, strlen(msg), &written, NULL);
-    }
-
     void MyWindowsPrintLastError(MyContext context) {
         LPVOID lpMsgBuf;
         DWORD dw = GetLastError(); 
@@ -1377,74 +1368,81 @@ MY_NORETURN void MyExit() {
   #endif
 }
 
+typedef struct {
+    const char* title;
+    int32_t     color;
+    bool        err;
+    bool        disable;
+} MyLogLevelData;
+
+static MyLogLevelData myLogLevelData[6] = {
+    [MY_INFO] = (MyLogLevelData){.err = false, .title = MY_INFO_TITLE, .color = MY_INFO_COLOR, 
+    #ifdef MY_LOG_INFO_DISABLE
+        .disable = true
+    #else
+        .disable = false
+    #endif
+    },
+    [MY_DEBUG] = (MyLogLevelData){.err = false, .title = MY_DEBUG_TITLE, .color = MY_DEBUG_COLOR, 
+    #ifdef MY_LOG_DEBUG_DISABLE
+        .disable = true
+    #else
+        .disable = false
+    #endif
+    },
+    [MY_SUCCESS] = (MyLogLevelData){.err = false, .title = MY_SUCCESS_TITLE, .color = MY_SUCCESS_COLOR, 
+    #ifdef MY_LOG_SUCCESS_DISABLE
+        .disable = true
+    #else
+        .disable = false
+    #endif
+    },
+    [MY_WARNING] = (MyLogLevelData){.err = true, .title = MY_WARNING_TITLE, .color = MY_WARNING_COLOR, 
+    #ifdef MY_LOG_WARNING_DISABLE
+        .disable = true
+    #else
+        .disable = false
+    #endif
+    },
+    [MY_ERROR] = (MyLogLevelData){.err = true, .title = MY_ERROR_TITLE, .color = MY_ERROR_COLOR, 
+    #ifdef MY_LOG_ERROR_DISABLE
+        .disable = true
+    #else
+        .disable = false
+    #endif
+    },
+    [MY_FATAL] = (MyLogLevelData){.err = true, .title = MY_FATAL_TITLE, .color = MY_FATAL_COLOR, 
+    #ifdef MY_LOG_FATAL_DISABLE
+        .disable = true
+    #else
+        .disable = false
+    #endif
+    }
+};
+
 void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
 #ifndef MY_LOG_DISABLE_ALL
-    char buffer[2048] = {0};
-    MyFile* file = MY_LOG_STDOUT_FILE;
-    const char* title = MY_INFO_TITLE;
-    switch(level) {
-        case MY_INFO: {
-            #ifdef MY_INFO_DISABLE 
-                return;
-            #endif
-            title = MY_INFO_TITLE;
-            break; 
-        }
-        case MY_DEBUG: { 
-            #if defined(NDEBUG) || (defined(MY_DEBUG_DISABLE) && !defined(NDEBUG)) 
-                return;
-            #endif
-            title = MY_DEBUG_TITLE;
-            break; 
-        }
-        case MY_SUCCESS: { 
-            #ifdef MY_SUCCESS_DISABLE 
-                return;
-            #endif
-            title = MY_SUCCESS_TITLE;
-            break; 
-        }
-        case MY_WARNING: { 
-            #ifdef MY_WARNING_DISABLE 
-                return;
-            #endif
-            title = MY_WARNING_TITLE;
-            file = MY_LOG_STDERR_FILE;
-            break; 
-        }
-        case MY_ERROR: { 
-            #ifdef MY_ERROR_DISABLE 
-                return;
-            #endif
-            title = MY_ERROR_TITLE;
-            file = MY_LOG_STDERR_FILE;
-            break; 
-        }
-        case MY_FATAL: { 
-            #ifdef MY_FATAL_DISABLE 
-                return;
-            #endif
-            title = MY_FATAL_TITLE;
-            file = MY_LOG_STDERR_FILE;
-            break; 
-        }
-        // Behaves like MY_INFO
-        default: {
-            #ifdef MY_INFO_DISABLE 
-                return;
-            #endif
-            title = MY_INFO_TITLE;
-            break;
-        }
-    }
+    level = level % 6;
+    if (myLogLevelData[level].disable) { return; }
 
-    MySnprintfSegments(buffer, sizeof(buffer),
+    char buffer[2048] = {0};
+    MyFile* file = MY_TERNARY(myLogLevelData[level].err, MY_LOG_STDOUT_FILE, MY_LOG_STDERR_FILE); 
+    const char* title = myLogLevelData[level].title;
+    int32_t color = myLogLevelData[level].color;
+
+    if (MyFileIsStd(file)) {
+        MySnprintfSegments(buffer, sizeof(buffer),
         SEG("", "%s\n", STR(title)),
-        SEG("F: 244", "Context: "),
-        SEG("F: 189 S: 2", "%s:%u -> %s()\n", STR(context.file), I32(context.line), STR(context.func)),
-        SEG("F: 244", "Message: "),
-        SEG("F: 207", "%s\n\n", STR(msg))
-    );
+        SEG("F*", "Context: ", I32(MY_LABEL_COLOR)),
+        SEG("F* S2", "%s:%u -> %s()\n", I32(MY_CONTEXT_COLOR), STR(context.file), I32(context.line), STR(context.func)),
+        SEG("F*", "Message: ", I32(MY_LABEL_COLOR)),
+        SEG("F*", "%s\n\n", I32(MY_MESSAGE_COLOR), STR(msg))
+        );
+    } else {
+        MySnprintf(buffer, sizeof(buffer), 
+        "%s\n Context: %s:%u -> %s()\n Message: %s\n\n", 
+        title, context.file, context.line, context.func, msg);
+    }
 
     MyFilePrint(file, buffer);
     if (level == MY_FATAL) { MyExit(); }

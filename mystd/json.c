@@ -1,3 +1,4 @@
+#include "mystd/stdlib.h"
 #define MY_JSON_VECTOR
 #include <mystd/json.h>
 
@@ -102,6 +103,33 @@ MyJsonType  MyJson_Type         (MyJson* json) {
     MY_ASSERT_PTR(json);
     return json->type;
 }
+bool        MyJson_Bool         (MyJson* json) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT(json->type == MY_JSON_BOOL, "Json element is not a boolean");
+    return json->data.boolean;
+}
+int64_t     MyJson_Integer      (MyJson* json) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT(json->type == MY_JSON_INTEGER, "Json element is not an integer");
+    return json->data.integer;
+}
+double      MyJson_Decimal      (MyJson* json) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT(json->type == MY_JSON_DECIMAL, "Json element is not a decimal");
+    return json->data.decimal;
+}
+double      MyJson_Number       (MyJson* json) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT(json->type == MY_JSON_INTEGER || json->type == MY_JSON_DECIMAL, "Json element is not a number");
+    if (json->type == MY_JSON_INTEGER) { return (double)json->data.integer; }
+    return json->data.decimal;
+}
+char*       MyJson_String       (MyJson* json) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT(json->type == MY_JSON_STRING, "Json element is not a string");
+    return json->data.string;
+}
+
 bool        MyJson_IsNull       (MyJson* json) {
     MY_ASSERT_PTR(json);
     return json->type == MY_JSON_NULL;
@@ -118,6 +146,10 @@ bool        MyJson_IsDecimal    (MyJson* json) {
     MY_ASSERT_PTR(json);
     return json->type == MY_JSON_DECIMAL;
 }
+bool        MyJson_IsNumber     (MyJson* json) {
+    MY_ASSERT_PTR(json);
+    return json->type == MY_JSON_INTEGER || json->type == MY_JSON_DECIMAL;
+}
 bool        MyJson_IsString     (MyJson* json) {
     MY_ASSERT_PTR(json);
     return json->type == MY_JSON_STRING;
@@ -133,17 +165,17 @@ bool        MyJson_IsObject     (MyJson* json) {
 
 size_t      MyJson_ArraySize    (MyJson* json) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     return json->data.array.size;
 }
 void        MyJson_ArrayRemove  (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJsonArray_Erase(&json->data.array, index);
 }
 void        MyJson_ArrayForEach (MyJson* json, bool(*foreach)(MyJson* it, size_t index, void* userp), void* userp) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     for (size_t i = 0; i < json->data.array.size; i++) {
         MyJson* object = MyJsonArray_Get(&json->data.array, i);
         if (foreach(object, i, userp)) {
@@ -154,12 +186,12 @@ void        MyJson_ArrayForEach (MyJson* json, bool(*foreach)(MyJson* it, size_t
 
 size_t      MyJson_ObjectSize   (MyJson* json) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     return json->data.array.size;
 }
 void        MyJson_ObjectRemove (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     for (size_t i = 0; i < json->data.array.size; i++) {
         MyJson* object = MyJsonArray_Get(&json->data.array, i);
         if (strcmp(object->key, key) == 0) {
@@ -170,7 +202,7 @@ void        MyJson_ObjectRemove (MyJson* json, const char* key) {
 }
 void        MyJson_ObjectForEach(MyJson* json, bool(*foreach)(MyJson* it, const char* key, void* userp), void* userp) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     for (size_t i = 0; i < json->data.array.size; i++) {
         MyJson* object = MyJsonArray_Get(&json->data.array, i);
         if (foreach(object, object->key, userp)) {
@@ -200,7 +232,7 @@ MyJson*     MyJson_KGetPath         (MyJson* json, const char* path) {
         }
         key[length] = '\0';
 
-        if (length == 0 && *path != '[') { MyLog(MY_FATAL, "Empty key but no '[' was founded"); }
+        MY_NASSERT(length == 0 && *path != '[', "Empty key but no '[' was founded");
 
         if (length > 0) {
             MY_ASSERT(current->type == MY_JSON_OBJECT, "Not an object");
@@ -221,7 +253,6 @@ MyJson*     MyJson_KGetPath         (MyJson* json, const char* path) {
             MY_ASSERT(*path++ == ']', "Missing ']'");
             MY_ASSERT(current->type == MY_JSON_ARRAY, "Not an array");
             current = MyJson_Get(current, index);
-            continue;
         }
 
         if (*path == '.') {
@@ -244,7 +275,7 @@ bool        MyJson_KGetBool         (MyJson* json, const char* key) {
     MY_ASSERT_PTR(key);
     MyJson* child = MyJson_Find(json, key);
     MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MY_ASSERT(child->type == MY_JSON_BOOL, "Element is not a boolean");
+    MY_ASSERT(child->type == MY_JSON_BOOL, "Json element is not a boolean");
     return child->data.boolean;
 }
 int64_t     MyJson_KGetInteger      (MyJson* json, const char* key) {
@@ -252,7 +283,7 @@ int64_t     MyJson_KGetInteger      (MyJson* json, const char* key) {
     MY_ASSERT_PTR(key);
     MyJson* child = MyJson_Find(json, key);
     MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MY_ASSERT(child->type == MY_JSON_INTEGER, "Element is not a integer");
+    MY_ASSERT(child->type == MY_JSON_INTEGER, "Json element is not an integer");
     return child->data.integer;
 }
 double      MyJson_KGetDecimal      (MyJson* json, const char* key) {
@@ -260,15 +291,24 @@ double      MyJson_KGetDecimal      (MyJson* json, const char* key) {
     MY_ASSERT_PTR(key);
     MyJson* child = MyJson_Find(json, key);
     MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MY_ASSERT(child->type == MY_JSON_DECIMAL, "Element is not a decimal");
+    MY_ASSERT(child->type == MY_JSON_DECIMAL, "Json element is not a decimal");
     return child->data.decimal;
+}
+double      MyJson_KGetNumber       (MyJson* json, const char* key) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT_PTR(key);
+    MyJson* child = MyJson_Find(json, key);
+    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
+    MY_ASSERT(child->type == MY_JSON_INTEGER || child->type == MY_JSON_DECIMAL, "Json element is not a number");
+    if (json->type == MY_JSON_INTEGER) { return (double)json->data.integer; }
+    return json->data.decimal;
 }
 char*       MyJson_KGetString       (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
     MyJson* child = MyJson_Find(json, key);
     MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MY_ASSERT(child->type == MY_JSON_STRING, "Element is not a string");
+    MY_ASSERT(child->type == MY_JSON_STRING, "Json element is not a string");
     return child->data.string;
 }
 MyJson*     MyJson_KGetArray        (MyJson* json, const char* key) {
@@ -276,7 +316,7 @@ MyJson*     MyJson_KGetArray        (MyJson* json, const char* key) {
     MY_ASSERT_PTR(key);
     MyJson* child = MyJson_Find(json, key);
     MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MY_ASSERT(child->type == MY_JSON_ARRAY, "Element is not an array");
+    MY_ASSERT(child->type == MY_JSON_ARRAY, "Json element is not an array");
     return child;
 }
 MyJson*     MyJson_KGetObject       (MyJson* json, const char* key) {
@@ -284,115 +324,133 @@ MyJson*     MyJson_KGetObject       (MyJson* json, const char* key) {
     MY_ASSERT_PTR(key);
     MyJson* child = MyJson_Find(json, key);
     MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MY_ASSERT(child->type == MY_JSON_OBJECT, "Element is not an object");
+    MY_ASSERT(child->type == MY_JSON_OBJECT, "Json element is not an object");
     return child;
 }
 
 void        MyJson_KSetNull      (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_NullReplace(child);
+    if (child) { MyJson_NullReplace(child); }
+    else {
+        child = MyJson_Add(json, MY_JSON_NULL, key);
+    }
 }
 void        MyJson_KSetBool      (MyJson* json, const char* key, bool boolean) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_BoolReplace(child, boolean);
+    if (child) { MyJson_BoolReplace(child, boolean); }
+    else {
+        child = MyJson_Add(json, MY_JSON_BOOL, key);
+        child->data.decimal = boolean;
+    }
 }
 void        MyJson_KSetInteger   (MyJson* json, const char* key, int64_t integer) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_IntegerReplace(child, integer);
+    if (child) { MyJson_IntegerReplace(child, integer); }
+    else {
+        child = MyJson_Add(json, MY_JSON_INTEGER, key);
+        child->data.integer = integer;
+    }
 }
 void        MyJson_KSetDecimal   (MyJson* json, const char* key, double decimal) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_DecimalReplace(child, decimal);
+    if (child) { MyJson_DecimalReplace(child, decimal); }
+    else {
+        child = MyJson_Add(json, MY_JSON_DECIMAL, key);
+        child->data.decimal = decimal;
+    }
 }
 void        MyJson_KSetString    (MyJson* json, const char* key, const char* string) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_StringReplace(child, string);
+    if (child) { MyJson_StringReplace(child, string); }
+    else {
+        child = MyJson_Add(json, MY_JSON_STRING, key);
+        child->data.string = MyStrdup(string, NULL);
+    }
 }
 MyJson*     MyJson_KSetArray     (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_ArrayReplace(child);
+    if (child) { MyJson_ArrayReplace(child); }
+    else {
+        child = MyJson_Add(json, MY_JSON_ARRAY, key);
+    }
     return child;
 }
 MyJson*     MyJson_KSetObject    (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MyJson* child = MyJson_Find(json, key);
-    MY_ASSERT(child != NULL, "Inexisting element with key = %s", key);
-    MyJson_ObjectReplace(child);
+    if (child) { MyJson_ObjectReplace(child); }
+    else {
+        child = MyJson_Add(json, MY_JSON_OBJECT, key);
+    }
     return child;
 }
 
 void        MyJson_KInsertNull      (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     MyJson_Add(json, MY_JSON_NULL, key);
 }
 void        MyJson_KInsertBool      (MyJson* json, const char* key, bool boolean) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     MyJson_Add(json, MY_JSON_BOOL, key)->data.boolean = boolean;
 }
 void        MyJson_KInsertInteger   (MyJson* json, const char* key, int64_t integer) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     MyJson_Add(json, MY_JSON_INTEGER, key)->data.integer = integer;
 }
 void        MyJson_KInsertDecimal   (MyJson* json, const char* key, double decimal) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     MyJson_Add(json, MY_JSON_DECIMAL, key)->data.decimal = decimal;
 }
 void        MyJson_KInsertString    (MyJson* json, const char* key, const char* string) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     MyJson_Add(json, MY_JSON_STRING, key)->data.string = MyStrdup(string, NULL);
 }
 MyJson*     MyJson_KInsertArray     (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     return MyJson_Add(json, MY_JSON_ARRAY, key);
 }
 MyJson*     MyJson_KInsertObject    (MyJson* json, const char* key) {
     MY_ASSERT_PTR(json);
     MY_ASSERT_PTR(key);
-    MY_ASSERT(json->type == MY_JSON_OBJECT, "json is not an object");
+    MY_ASSERT(json->type == MY_JSON_OBJECT, "Json element is not an object");
     MY_ASSERT(MyJson_Find(json, key) == NULL, "Existing element with key = %s", key);
     return MyJson_Add(json, MY_JSON_OBJECT, key);
 }
@@ -406,85 +464,93 @@ bool        MyJson_GetBool      (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
     MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
     MyJson* child = MyJsonArray_Get(&json->data.array, index);
-    MY_ASSERT(child->type == MY_JSON_BOOL, "Item is not boolean");
+    MY_ASSERT(child->type == MY_JSON_BOOL, "Json element is not boolean");
     return child->data.boolean;
 }
 int64_t     MyJson_GetInteger   (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
     MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
     MyJson* child = MyJsonArray_Get(&json->data.array, index);
-    MY_ASSERT(child->type == MY_JSON_INTEGER, "Item is not integer");
+    MY_ASSERT(child->type == MY_JSON_INTEGER, "Json element is not integer");
     return child->data.integer;
 }
 double      MyJson_GetDouble    (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
     MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
     MyJson* child = MyJsonArray_Get(&json->data.array, index);
-    MY_ASSERT(child->type == MY_JSON_DECIMAL, "Item is not decimal");
+    MY_ASSERT(child->type == MY_JSON_DECIMAL, "Json element is not decimal");
     return child->data.decimal;
+}
+double      MyJson_GetNumber    (MyJson* json, size_t index) {
+    MY_ASSERT_PTR(json);
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
+    MyJson* child = MyJsonArray_Get(&json->data.array, index);
+    MY_ASSERT(child->type == MY_JSON_INTEGER || child->type == MY_JSON_DECIMAL, "Json element is not a number");
+    if (json->type == MY_JSON_INTEGER) { return (double)json->data.integer; }
+    return json->data.decimal;
 }
 char*       MyJson_GetString    (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
     MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
     MyJson* child = MyJsonArray_Get(&json->data.array, index);
-    MY_ASSERT(child->type == MY_JSON_STRING, "Item is not string");
+    MY_ASSERT(child->type == MY_JSON_STRING, "Json element is not string");
     return child->data.string;
 }
 MyJson*     MyJson_GetArray     (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
     MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
     MyJson* child = MyJsonArray_Get(&json->data.array, index);
-    MY_ASSERT(child->type == MY_JSON_ARRAY, "Item is not array");
+    MY_ASSERT(child->type == MY_JSON_ARRAY, "Json element is not array");
     return child;
 }
 MyJson*     MyJson_GetObject    (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
     MY_ASSERT(json->type == MY_JSON_ARRAY, "Trying to get an array element in a non array object");
     MyJson* child = MyJsonArray_Get(&json->data.array, index);
-    MY_ASSERT(child->type == MY_JSON_OBJECT, "Item is not object");
+    MY_ASSERT(child->type == MY_JSON_OBJECT, "Json element is not object");
     return child;
 }
 
 void        MyJson_SetNull      (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_NullReplace(child);
 }
 void        MyJson_SetBool      (MyJson* json, size_t index, bool boolean) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_BoolReplace(child, boolean);
 }
 void        MyJson_SetInteger   (MyJson* json, size_t index, int64_t integer) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_IntegerReplace(child, integer);
 }
 void        MyJson_SetDecimal   (MyJson* json, size_t index, double decimal) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_DecimalReplace(child, decimal);
 }
 void        MyJson_SetString    (MyJson* json, size_t index, const char* string) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_StringReplace(child, string);
 }
 MyJson*     MyJson_SetArray     (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_ArrayReplace(child);
     return child;
 }
 MyJson*     MyJson_SetObject    (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Get(json, index);
     MyJson_ObjectReplace(child);
     return child;
@@ -492,48 +558,48 @@ MyJson*     MyJson_SetObject    (MyJson* json, size_t index) {
 
 void        MyJson_InsertNull   (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_NULL, NULL);
     MyJsonArray_Insert(&json->data.array, index, child);
 }
 void        MyJson_InsertBool   (MyJson* json, size_t index, bool boolean) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_BOOL, NULL);
     child->data.boolean = boolean;
     MyJsonArray_Insert(&json->data.array, index, child);
 }
 void        MyJson_InsertInteger(MyJson* json, size_t index, int64_t integer) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_INTEGER, NULL);
     child->data.integer = integer;
     MyJsonArray_Insert(&json->data.array, index, child);
 }
 void        MyJson_InsertDecimal(MyJson* json, size_t index, double decimal) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_DECIMAL, NULL);
     child->data.decimal = decimal;
     MyJsonArray_Insert(&json->data.array, index, child);
 }
 void        MyJson_InsertString (MyJson* json, size_t index, const char* string) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_STRING, NULL);
     child->data.string = MyStrdup(string, NULL);
     MyJsonArray_Insert(&json->data.array, index, child);
 }
 MyJson*     MyJson_InsertArray  (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_ARRAY, NULL);
     MyJsonArray_Insert(&json->data.array, index, child);
     return child;
 }
 MyJson*     MyJson_InsertObject (MyJson* json, size_t index) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Create(MY_JSON_OBJECT, NULL);
     MyJsonArray_Insert(&json->data.array, index, child);
     return child;
@@ -541,47 +607,84 @@ MyJson*     MyJson_InsertObject (MyJson* json, size_t index) {
 
 void        MyJson_PushNull     (MyJson* json) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson_Add(json, MY_JSON_NULL, NULL);
 }
 void        MyJson_PushBool     (MyJson* json, bool boolean) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Add(json, MY_JSON_BOOL, NULL);
     child->data.boolean = boolean;
 }
 void        MyJson_PushInteger  (MyJson* json, int64_t integer) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Add(json, MY_JSON_INTEGER, NULL);
     child->data.integer = integer;
 }
 void        MyJson_PushDecimal  (MyJson* json, double decimal) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Add(json, MY_JSON_DECIMAL, NULL);
     child->data.decimal = decimal;
 }
 void        MyJson_PushString   (MyJson* json, const char* string) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     MyJson* child = MyJson_Add(json, MY_JSON_STRING, NULL);
     child->data.string = MyStrdup(string, NULL);
 }
 MyJson*     MyJson_PushArray    (MyJson* json) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     return MyJson_Add(json, MY_JSON_ARRAY, NULL);
 }
 MyJson*     MyJson_PushObject   (MyJson* json) {
     MY_ASSERT_PTR(json);
-    MY_ASSERT(json->type == MY_JSON_ARRAY, "json is not an array");
+    MY_ASSERT(json->type == MY_JSON_ARRAY, "Json element is not an array");
     return MyJson_Add(json, MY_JSON_OBJECT, NULL);
 }
 
 /* ============================================================
    Helpers Implementation
    ============================================================ */
+
+static int MyJson_HexVal(char c) {
+    if ('0' <= c && c <= '9') return c - '0';
+    if ('a' <= c && c <= 'f') return c - 'a' + 10;
+    if ('A' <= c && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+static int MyJson_ParseU4(const char *s) {
+    int v = 0;
+    for (int i = 0; i < 4; i++) {
+        int h = MyJson_HexVal(s[i]);
+        if (h < 0) { return -1; }
+        v = (v << 4) | h;
+    }
+    return v;
+}
+static int MyJson_UTF8Encode(char *out, int cp) {
+    if (cp <= 0x7F) {
+        out[0] = (char)cp;
+        return 1;
+    } else if (cp <= 0x7FF) {
+        out[0] = 0xC0 | (cp >> 6);
+        out[1] = 0x80 | (cp & 0x3F);
+        return 2;
+    } else if (cp <= 0xFFFF) {
+        out[0] = 0xE0 | (cp >> 12);
+        out[1] = 0x80 | ((cp >> 6) & 0x3F);
+        out[2] = 0x80 | (cp & 0x3F);
+        return 3;
+    } else {
+        out[0] = 0xF0 | (cp >> 18);
+        out[1] = 0x80 | ((cp >> 12) & 0x3F);
+        out[2] = 0x80 | ((cp >> 6) & 0x3F);
+        out[3] = 0x80 | (cp & 0x3F);
+        return 4;
+    }
+}
 
 static void MyJsonString_CtoJson(MyString* str, const char* src) {
     while (*src) {
@@ -592,6 +695,19 @@ static void MyJsonString_CtoJson(MyString* str, const char* src) {
         else if (*src == '\r') { MyString_Append(str, "\\r"); }
         else if (*src == '\b') { MyString_Append(str, "\\b"); }
         else if (*src == '\f') { MyString_Append(str, "\\f"); }
+        else if ((unsigned char)*src < 0x20) {
+            static const char hex[] = "0123456789ABCDEF";
+            unsigned char c = (unsigned char)*src;
+            char buf[6];
+            buf[0] = '\\';
+            buf[1] = 'u';
+            buf[2] = '0';
+            buf[3] = '0';
+            buf[4] = hex[(c >> 4) & 0xF];
+            buf[5] = hex[c & 0xF];
+
+            MyString_AppendN(str, buf, 6);
+        }
         else { MyString_PushBack(str, *src); }
         src++;
     }
@@ -605,15 +721,48 @@ static void MyJsonString_JsontoC(char* src, size_t count) {
         }
 
         i++;
-        if (src[i] == '\"') { src[cursor++] = '\"'; }
-        else if (src[i] == '\\') { src[cursor++] = '\\'; }
-        else if (src[i] == '/') { src[cursor++] = '/'; }
-        else if (src[i] == 'n') { src[cursor++] = '\n'; }
-        else if (src[i] == 't') { src[cursor++] = '\t'; }
-        else if (src[i] == 'r') { src[cursor++] = '\r'; }
-        else if (src[i] == 'b') { src[cursor++] = '\b'; }
-        else if (src[i] == 'f') { src[cursor++] = '\f'; }
-        else if (src[i] == 'u') { MyLog(MY_FATAL, "Sorry \\uXXXX is not supported, working on that"); }
+        MY_ASSERT(i < count, "Invalid escape at end of string");
+        char c = src[i];
+
+        if (c == '\"')      { src[cursor++] = '\"'; continue; }
+        else if (c == '\\') { src[cursor++] = '\\'; continue; }
+        else if (c == '/')  { src[cursor++] =  '/'; continue; }
+        else if (c == 'n')  { src[cursor++] = '\n'; continue; }
+        else if (c == 't')  { src[cursor++] = '\t'; continue; }
+        else if (c == 'r')  { src[cursor++] = '\r'; continue; }
+        else if (c == 'b')  { src[cursor++] = '\b'; continue; }
+        else if (c == 'f')  { src[cursor++] = '\f'; continue; }
+        else if (c != 'u')  { MyLog(MY_FATAL, "Invalid escape sequence '%c'", c); }
+
+        // Need 4 hex digits
+        MY_ASSERT(i + 4 < count, "Invalid \\u escape");
+        
+        int cp = MyJson_ParseU4(&src[i + 1]);
+        MY_ASSERT(cp >= 0, "Invalid hex in \\u escape");
+        MY_NASSERT(cp >= 0xDC00 && cp <= 0xDFFF, "Unexpected low surrogate");
+        
+        i += 4;
+
+        // Handle surrogate pairs
+        if (cp >= 0xD800 && cp <= 0xDBFF) {
+            // high surrogate, expect \uXXXX next
+            MY_ASSERT(i + 6 < count, "Invalid surrogate pair length");
+            MY_ASSERT(src[i + 1] == '\\' && src[i + 2] == 'u', "Invalid surrogate pair");
+
+            int low = MyJson_ParseU4(&src[i + 3]);
+            MY_ASSERT(low >= 0xDC00 && low <= 0xDFFF, "Invalid low surrogate");
+
+            // Combine into full codepoint
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+            i += 6; // skip \uXXXX
+        }
+
+        char utf8[4];
+        int len = MyJson_UTF8Encode(utf8, cp);
+
+        for (int k = 0; k < len; k++) {
+            src[cursor++] = utf8[k];
+        }
     }
     src[cursor] = '\0';
 }
@@ -904,8 +1053,8 @@ static MyJson* MyJson_ParseIntegerDecimal(MyJsonWriter* writer) {
     bool negative = false;
     if (*writer->source == '-') {
         negative = true;
-        writer->col ++;
-        writer->source ++;
+        writer->col++;
+        writer->source++;
     }
 
     MyJson* json = NULL;
@@ -914,37 +1063,39 @@ static MyJson* MyJson_ParseIntegerDecimal(MyJsonWriter* writer) {
         MY_JSON_ASSERT(writer, false, "Invalid leading zeros");
     }
 
-    int64_t integer = 0;
-    while (isdigit(*writer->source)) { 
-        integer *= 10; 
-        integer += *writer->source++ - '0'; 
-        writer->col++;
-    }
+    const char* temp = writer->source;
+    while (isdigit(*temp)) { temp++; }
+    bool nonInteger = *temp == '.' || *temp == 'e' || *temp == 'E';
 
-    if (*writer->source != '.') {
-        if (negative) { integer = 0-integer; }
+    if (!nonInteger) {
+        int64_t integer = 0;
+        while (isdigit(*writer->source)) { 
+            int digit = *writer->source - '0';
+            writer->source++;
+            writer->col++;
+            if (negative) {
+                if (integer < (INT64_MIN + digit) / 10) { goto parseDouble; }
+                integer = integer * 10 - digit;
+            } else {
+                if (integer > (INT64_MAX - digit) / 10) { goto parseDouble; }
+                integer = integer * 10 + digit;
+            }
+        }
         json = MyJson_Create(MY_JSON_INTEGER, NULL);
         json->data.integer = integer;
         return json;
     }
 
-    writer->source++;
-    int decimals = 0;
-    int64_t decimal = 0;
-    while (isdigit(*writer->source)) { 
-        decimals++; 
-        decimal *= 10; 
-        decimal += *writer->source++ - '0'; 
-        writer->col++;
-    }
-    
-    double factor = 1.0;
-    while (decimals--) { factor /= 10.0; }
-    double value = integer + decimal * factor;
-    if (negative) { value = 0-value; }
+parseDouble:
+    char* end;
+    double decimal = strtod(writer->source, &end);
+    MY_JSON_ASSERT(writer, isfinite(decimal), "Invalid JSON number");
+    MY_JSON_ASSERT(writer, end != writer->source, "Invalid strtod number");
 
+    writer->col += (end - writer->source);
+    writer->source = end;
     json = MyJson_Create(MY_JSON_DECIMAL, NULL);
-    json->data.decimal = value;
+    json->data.decimal = decimal;
     return json;
 }
 static MyJson* MyJson_ParseString(MyJsonWriter* writer) {

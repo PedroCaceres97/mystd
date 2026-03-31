@@ -336,7 +336,7 @@ MyFile* MyStderr();
 void MyFileClose(MyFile* file);
 MyFile* MyFileOpen(const char* path, MyFileFlag flag);
 // Allocated buffer must be freed with MY_FREE
-uint8_t* MyFileDump(const char* path, size_t* size);
+char* MyFileDump(const char* path, size_t* size);
 
 size_t MyFileRead(MyFile* file, char* data, size_t max);
 size_t MyFileWrite(MyFile* file, const char* data, size_t max);
@@ -567,6 +567,7 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg);
 #define MyLog(level, format, ...) MyLogCtx(level, MY_CONTEXT, MySprintf(format, ##__VA_ARGS__))
 
 #define MY_ASSERT(cnd, format, ...)              do { if (!(cnd))            { MyLog(MY_FATAL, format, ##__VA_ARGS__);                                                  } } while(0)
+#define MY_NASSERT(cnd, format, ...)             do { if ((cnd))             { MyLog(MY_FATAL, format, ##__VA_ARGS__);                                                  } } while(0)
 #define MY_ASSERT_PTR(ptr)                       do { if ((ptr) == NULL)     { MyLog(MY_FATAL, "'"#ptr "' is NULL");                                                    } } while(0)
 #define MY_ASSERT_BOUNDS(idx, bound)             do { if ((idx) >= (bound))  { MyLog(MY_FATAL, "Index (%zu) out of Bounds (%zu)", idx, bound);                          } } while(0)
 #define MY_ASSERT_MALLOC(ptr, type, size)        do { if (ptr == NULL)       { MyLog(MY_FATAL, "Malloc failed for "  #ptr " of type " #type " and size %zu",  size);    } } while(0)

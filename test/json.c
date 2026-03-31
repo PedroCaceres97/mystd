@@ -3,33 +3,17 @@
 #include <mystd/json.c>
 
 int main() {
-    MyJsonRoot* root = MyJsonRoot_Create(NULL, MY_JSON_OBJECT);
-    MyJson* body = root->body;
-    MyJson_KInsertNull(body, "none");
-    MyJson_KInsertBool(body, "bool1", true);
-    MyJson_KInsertBool(body, "bool2", false);
-    MyJson_KInsertInteger(body, "integer1", 256);
-    MyJson_KInsertDecimal(body, "decimal2", 256.789);
-    MyJson_KInsertDecimal(body, "decimal3", 3.14159265);
-    
-    MyJson* text = MyJson_KInsertObject(body, "text");
-    MyJson_KInsertString(text, "hola", "Hola mundo!");
-    MyJson_KInsertString(text, "new", "Hola mundo!\n");
-    MyJson_KInsertString(text, "todo", "que tal todo!");
+    char* json = MyFileDump("C:/Dev/mystd/test/github_example.json", NULL);
+    MyJsonRoot root = {0};
+    MyJsonRoot_Parse(&root, json);
+    MY_FREE(json);
+    MyJson* body = root.body;
 
-    char* pretty = MyJsonRoot_Print(root, true);
-    char* prettynt = MyJsonRoot_Print(root, false);
-    MyJsonRoot_Destroy(root);
+    char* name = MyJson_String(MyJson_KGetPath(body, "[0].commit.committer.name"));
+    MyPrintf("[0].commit.commiter.name = %s\n\n", name);
 
-    // MyFilePrint(MyStdout(), "Pretty:\n");
-    // MyFilePrint(MyStdout(), pretty);
-    // MyFilePrint(MyStdout(), "Prettynt:\n");
-    // MyFilePrint(MyStdout(), prettynt);
-    
-    MyJsonRoot* prettyJson = MyJsonRoot_Parse(NULL, pretty);
-    MyJsonRoot* prettyntJson = MyJsonRoot_Parse(NULL, prettynt);
+    char* url = MyJson_String(MyJson_KGetPath(body, "[0].parents[0].url"));
+    MyPrintf("[0].parents[0].url = %s\n\n", url);
 
-    MyFilePrint(MyStdout(), MyJsonRoot_Print(prettyJson, true));
-    MyFilePrint(MyStdout(), MyJsonRoot_Print(prettyntJson, false));
     return 0;
 }

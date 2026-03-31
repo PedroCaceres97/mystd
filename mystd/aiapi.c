@@ -1,52 +1,8 @@
-#define MY_AIAPI_VECTOR
 #include <mystd/aiapi.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-MyAIAPI*        MyAIAPI_Create      (MyAIAPI* api, MyAIAPIConfig config) {
-
-}
-void            MyAIAPI_Destroy     (MyAIAPI* api) {
-
-}
-void            MyAIAPI_Submmit     (MyAIAPI* api, MyAIAPIChat* chat) {
-
-}
-
-MyAIAPIChat*    MyAIAPIChat_Create  (MyAIAPIChat* chat, MyAIAPIChatConfig config) {
-
-}
-void            MyAIAPIChat_Destroy (MyAIAPIChat* chat) {
-
-}
-
-MyAIAPIChatMsg  MyAIAPIChat_Get     (MyAIAPIChat* chat, size_t idx) {
-
-}
-void            MyAIAPIChat_Set     (MyAIAPIChat* chat, MyAIAPIChatMsg msg, size_t idx) {
-
-}
-void            MyAIAPIChat_Push    (MyAIAPIChat* chat, MyAIAPIChatMsg msg) {
-
-}
-void            MyAIAPIChat_Insert  (MyAIAPIChat* chat, MyAIAPIChatMsg msg, size_t idx) {
-
-}
-void            MyAIAPIChat_Erase   (MyAIAPIChat* chat, size_t idx) {
-
-}
-
-/*
-
-* --------------------------------------------------------------------------
- * Default macros
- * -------------------------------------------------------------------------- *
 
 #define MY_AIAPI_OPENAI_DEFAULT_URL          "https://api.openai.com/v1/chat/completions"
 #define MY_AIAPI_OPENAI_DEFAULT_HISTORY      15
-#define MY_AIAPI_OPENAI_DEFAULT_REMOVE_IDX   1
+#define MY_AIAPI_OPENAI_DEFAULT_REMOVE_IDX   0
 #define MY_AIAPI_OPENAI_DEFAULT_MAXTOKENS    200
 #define MY_AIAPI_OPENAI_DEFAULT_TEMPERATURE  0.5f
 #define MY_AIAPI_OPENAI_DEFAULT_TOP_P        0.5f
@@ -54,553 +10,278 @@ void            MyAIAPIChat_Erase   (MyAIAPIChat* chat, size_t idx) {
 #define MY_AIAPI_OPENROUTER_DEFAULT_URL      "https://openrouter.ai/api/v1/chat/completions"
 #define MY_AIAPI_OPENROUTER_DEFAULT_X_TITLE  "mystd default x-title"
 
-* --------------------------------------------------------------------------
- * Helpers
- * -------------------------------------------------------------------------- *
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-static size_t       MyAIAPI_WriteCallback(void* data, size_t size, size_t nmemb, void* userp) {
+static size_t MyAIAPI_WriteCallback(void* data, size_t size, size_t nmemb, void* userp) {
     MY_ASSERT_PTR(data);
     MY_ASSERT_PTR(userp);
 
     MyAIAPI* api = (MyAIAPI*)userp;
-
     size_t total = size * nmemb;
-    
-    MY_REALLOC(api->response, char, api->response, api->response_size + total + 1);
-    memcpy(api->response + api->response_size, data, total);
-    api->response_size += total;
-    api->response[api->response_size] = '\0';
-
+    MY_REALLOC(api->buffer, char, api->buffer, api->written + total + 1);
+    memcpy(api->buffer + api->written, data, total);
+    api->written += total;
+    api->buffer[api->written] = '\0';
     return total;
 }
-static void         MyAIAPI_AppendHdr(struct curl_slist** header, const char* format, ...) {
+static void MyAIAPI_AppendHdr(struct curl_slist** header, const char* format, ...) {
     MY_ASSERT_PTR(header);
     MY_ASSERT_PTR(format);
 
-    char openai_temp_buffer[1024] = {0};
+    char buffer[2048] = {0};
     va_list args;
     va_start(args, format);
-    vsnprintf(openai_temp_buffer, sizeof(openai_temp_buffer), format, args);
+    MyVsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
     
-    *header = curl_slist_append(*header, openai_temp_buffer);
-    MY_ASSERT(*header != NULL, MySprintf("curl_slist_append failed -> %s", openai_temp_buffer));
+    *header = curl_slist_append(*header, buffer);
+    MY_ASSERT(*header != NULL, MySprintf("curl_slist_append failed -> %s", buffer));
 }
 
-* --------------------------------------------------------------------------
- * Backends
- * -------------------------------------------------------------------------- *
-
-    * --------------------------------------------------------------------------
-     * Openai
-     * -------------------------------------------------------------------------- *
-
-    static bool MyAIAPI_OpenaiParseArgs(cJSON* raw, cJSON** out) {
-        if (!cJSON_IsString(raw)) { return false; }
-        *out = cJSON_Parse(raw->valuestring);
-        return *out != NULL;
+static void MyAIAPIOpenai_InitHeaders(MyAIAPI* api) {
+    MyAIAPI_AppendHdr(&api->headers, "Authorization: Bearer %s", api->config.apiKey);
+    MyAIAPI_AppendHdr(&api->headers, "Content-Type: application/json");
+}
+static void MyAIAPIOpenrouter_InitHeaders(MyAIAPI* api) {
+    MyAIAPI_AppendHdr(&api->headers, "Authorization: Bearer %s", api->config.apiKey);
+    MyAIAPI_AppendHdr(&api->headers, "Content-Type: application/json");
+    if (api->config.httpReferer) {
+       MyAIAPI_AppendHdr(&api->headers, "HTTP-Referer: %s", api->config.httpReferer);
     }
-    static void MyAIAPI_OpenaiPushResult(MyAIAPI* api, const char* id, const char* name, cJSON* result) {
-        cJSON* msg = cJSON_CreateObject();
-        cJSON_AddStringToObject(msg, "role", "tool");
-        cJSON_AddStringToObject(msg, "tool_call_id", id);
-
-        char* printed = cJSON_PrintUnformatted(result);
-        if (printed) {
-            MY_ASSERT_PTR(cJSON_AddStringToObject(msg, "content", printed));
-            MY_FREE_IF(printed);
-        } else {
-            MY_ASSERT_PTR(cJSON_AddStringToObject(msg, "content", "{}"));
-        }
-
-        MyAIAPI_HistoryInsert(api, MyAIAPI_HistorySize(api), msg);
+    if (api->config.xtitle) {
+       MyAIAPI_AppendHdr(&api->headers, "X-Title: %s", api->config.xtitle);
     }
-    static void MyAIAPI_OpenaiInitHeaders(MyAIAPI* api) {
-        MyAIAPI_AppendHdr(&api->headers, "Authorization: Bearer %s", api->config.api_key);
-        MyAIAPI_AppendHdr(&api->headers, "Content-Type: application/json");
-    }
+}
+static void MyAIAPILlamaCpp_InitHeaders(MyAIAPI* api) {
+    MyAIAPI_AppendHdr(&api->headers, "Content-Type: application/json");
+}
 
-    static const struct MyAIAPIBackendOps MYAIAPI_OPENAI_BACKEND = {
-        .init_headers      = MyAIAPI_OpenaiInitHeaders,
-        .parse_tool_args   = MyAIAPI_OpenaiParseArgs,
-        .push_tool_result  = MyAIAPI_OpenaiPushResult,
-        .supports_seed     = true
-    };
+static bool backendSupportsSeed[] = {
+    [MY_AIAPI_OPENAI]       = true,
+    [MY_AIAPI_LLAMA_CPP]    = false,
+    [MY_AIAPI_OPENROUTER]   = true
+};
+static void (*backendInitHeaders[])(MyAIAPI*) = {
+    [MY_AIAPI_OPENAI]       = MyAIAPIOpenai_InitHeaders,
+    [MY_AIAPI_LLAMA_CPP]    = MyAIAPILlamaCpp_InitHeaders,
+    [MY_AIAPI_OPENROUTER]   = MyAIAPIOpenrouter_InitHeaders
+};
 
-  * --------------------------------------------------------------------------
-   * Openrouter
-   * -------------------------------------------------------------------------- *
+static const char* roleToString[] = {
+    [MY_AIAPI_ROLE_USER] = "user",
+    [MY_AIAPI_ROLE_SYSTEM] = "system",
+    [MY_AIAPI_ROLE_ASSISTANT] = "assistant"
+};
 
-    static bool MyAIAPI_OpenrouterParseArgs(cJSON* raw, cJSON** out) {
-        if (cJSON_IsString(raw)) {
-            *out = cJSON_Parse(raw->valuestring);
-        } else if (cJSON_IsObject(raw)) {
-            *out = cJSON_Duplicate(raw, true);
-        } else { 
-            return false;
-        }
-        return *out != NULL;
-    }
-    static void MyAIAPI_OpenrouterPushResult(MyAIAPI* api, const char* id, const char* name, cJSON* result) {
-        cJSON* msg = cJSON_CreateObject();
-        cJSON_AddStringToObject(msg, "role", "tool");
-        cJSON_AddStringToObject(msg, "tool_call_id", id);
-        cJSON_AddStringToObject(msg, "name", name);
+static MyAIAPIRole StringToRole(const char* string) {
+    if (strcmp(string, "user") == 0) { return MY_AIAPI_ROLE_USER; }
+    if (strcmp(string, "system") == 0) { return MY_AIAPI_ROLE_SYSTEM; }
+    if (strcmp(string, "assistant") == 0) { return MY_AIAPI_ROLE_ASSISTANT; }
+    MyLog(MY_FATAL, "String is not a role -> %s", string);
+    return MY_AIAPI_ROLE_USER;
+}
 
-        char* printed = cJSON_PrintUnformatted(result);
-        if (printed) {
-            MY_ASSERT_PTR(cJSON_AddStringToObject(msg, "content", printed));
-            cJSON_free(printed);
-        } else {
-            MY_ASSERT_PTR(cJSON_AddStringToObject(msg, "content", "{}"));
-        }
+MyAIAPIChatConfig MyAIAPI_DefaultChatConfig(int removeIndex) {
+    MyAIAPIChatConfig config = {0};
+    config.seed             = -1;
+    config.reasoning        = -1;
+    config.maxHistory       = 30;
+    config.removeIndex      = removeIndex;
+    config.maxTokens        = 200;
+    config.temperature      = 0.5f;
+    config.topp             = 0.5f;
+    config.presencePenalty  = 0.0f;
+    config.frequencyPenalty = 0.0f;
+    return config;
+}
 
-        MyAIAPI_HistoryInsert(api, MyAIAPI_HistorySize(api), msg);
-    }
-    static void MyAIAPI_OpenrouterInitHeaders(MyAIAPI* api) {
-        MyAIAPI_AppendHdr(&api->headers, "Authorization: Bearer %s", api->config.api_key);
-        MyAIAPI_AppendHdr(&api->headers, "Content-Type: application/json");
-
-        if (api->config.http_referer) {
-            MyAIAPI_AppendHdr(&api->headers, "HTTP-Referer: %s", api->config.http_referer);
-        }
-        if (api->config.x_title) {
-            MyAIAPI_AppendHdr(&api->headers, "X-Title: %s", api->config.x_title);
-        }
-    }
-
-    static const struct MyAIAPIBackendOps MYAIAPI_OPENROUTER_BACKEND = {
-        .init_headers      = MyAIAPI_OpenrouterInitHeaders,
-        .parse_tool_args   = MyAIAPI_OpenrouterParseArgs,
-        .push_tool_result  = MyAIAPI_OpenrouterPushResult,
-        .supports_seed     = true
-    };
-
-  * --------------------------------------------------------------------------
-   * Llama.cpp
-   * -------------------------------------------------------------------------- *
-
+MyAIAPI*        MyAIAPI_Create      (MyAIAPI* api, MyAIAPIConfig config) {
+    MY_ASSERT(config.model != NULL, "AI model cant be NULL");
+    MY_STRUCT_CREATE_RULE(api, MyAIAPI);
     
-    static void MyAIAPI_LlamaInitHeaders(MyAIAPI* api) {
-        MyAIAPI_AppendHdr(&api->headers, "Content-Type: application/json");
-    }
-
-    static const struct MyAIAPIBackendOps MYAIAPI_LLAMA_BACKEND = {
-      .init_headers      = MyAIAPI_LlamaInitHeaders,
-      .parse_tool_args   = MyAIAPI_OpenaiParseArgs,  same as OpenAI 
-      .push_tool_result  = MyAIAPI_OpenaiPushResult, same as OpenAI 
-      .supports_seed     = false
-    };
-
-* --------------------------------------------------------------------------
- * Implementation
- * -------------------------------------------------------------------------- *
-
-MY_RWLOCK_DEFINES(MyAIAPI, api, MyAIAPI)
-
-MyAIAPI*        MyAIAPI_Create          (MyAIAPI* api, MyAIAPIConfig config) {
-    MY_ASSERT_PTR(config.model);
-
-    MY_STRUCT_CREATE_RULE(api, MyAIAPI);
     api->config = config;
-}
-void            MyAIAPI_Destroy         (MyAIAPI* api) {
-
-}
-void            MyAIAPI_Submmit         (MyAIAPI* api, MyAIAPIChat* chat) {
-
-}
-
-MyAIAPIChat*    MyAIAPIChat_Create      (MyAIAPIChat* chat, MyAIAPIChatConfig config) {
-
-}
-void            MyAIAPIChat_Destroy     (MyAIAPIChat* chat) {
-
-}
-void            MyAIAPIChat_InsertUser  (MyAIAPIChat* chat, const char* msg) {
-
-}
-void            MyAIAPIChat_InsertSystem(MyAIAPIChat* chat, const char* msg) {
-
-}
-
-MyAIAPI*  MyAIAPI_Create        (MyAIAPI* api, MyAIAPIConfig config) {
-    MY_ASSERT_PTR(config.model);
-
-    MY_STRUCT_CREATE_RULE(api, MyAIAPI);
-    memset(api->attached, 0, sizeof(api->attached));
-    api->config = config;
-
-    * ------------------------------------------------------------------ *
-    * Defaults                                                           *
-    * ------------------------------------------------------------------ *
-
-    api->config.max_history    = config.max_history    > 0                          ? config.max_history    : MY_AIAPI_OPENAI_DEFAULT_HISTORY;
-    api->config.max_remove_idx = config.max_remove_idx >= 0                         ? config.max_remove_idx : MY_AIAPI_OPENAI_DEFAULT_REMOVE_IDX;
-    api->config.max_tokens     = (config.max_tokens > 0 || config.max_tokens == -1) ? config.max_tokens     : MY_AIAPI_OPENAI_DEFAULT_MAXTOKENS;
-    api->config.temperature    = config.temperature >= 0.f                          ? config.temperature    : MY_AIAPI_OPENAI_DEFAULT_TEMPERATURE;
-    api->config.top_p          = config.top_p >= 0.f                                ? config.top_p          : MY_AIAPI_OPENAI_DEFAULT_TOP_P;
-
-    MY_ASSERT_BOUNDS(api->config.max_remove_idx, api->config.max_history - 2);
-
-    * ------------------------------------------------------------------ *
-    * Backend selection                                                  *
-    * ------------------------------------------------------------------ *
-
-    if (config.backend == MY_AIAPI_OPENAI) {
-        api->backend = &MYAIAPI_OPENAI_BACKEND;
+    if (api->config.backend == MY_AIAPI_OPENAI) {
         if (!api->config.url) { api->config.url = MY_AIAPI_OPENAI_DEFAULT_URL; }
-        MY_ASSERT_PTR(api->config.api_key);
-    } else if (config.backend == MY_AIAPI_OPENROUTER) {
-        api->backend = &MYAIAPI_OPENROUTER_BACKEND;
-        if (!api->config.url) { api->config.url = MY_AIAPI_OPENROUTER_DEFAULT_URL; }
-        if (!api->config.x_title) { api->config.x_title = MY_AIAPI_OPENROUTER_DEFAULT_X_TITLE; }
-        MY_ASSERT_PTR(api->config.api_key);
+        MY_ASSERT(api->config.apiKey, "When using MY_AIAPI_OPENAI apiKey cant be NULL");
     } else if (config.backend == MY_AIAPI_LLAMA_CPP) {
-        api->backend = &MYAIAPI_LLAMA_BACKEND;
-        MY_ASSERT_PTR(api->config.url); llama MUST provide url
+        MY_ASSERT(api->config.url, "When using MY_AIAPI_LLAMA_CPP url cant be NULL");
+    } else if (config.backend == MY_AIAPI_OPENROUTER) {
+        if (!api->config.url) { api->config.url = MY_AIAPI_OPENROUTER_DEFAULT_URL; }
+        if (!api->config.xtitle) { api->config.xtitle = MY_AIAPI_OPENROUTER_DEFAULT_X_TITLE; }
+        MY_ASSERT(api->config.apiKey, "When using MY_AIAPI_OPENROUTER apiKey cant be NULL");
     } else {
         MY_ASSERT(false, "Unknown MyAIAPI backend");
     }
 
-    MY_ASSERT_PTR(api->backend);
-
-    * ------------------------------------------------------------------ *
-    * Root JSON                                                          *
-    * ------------------------------------------------------------------ *
-
-    api->root = cJSON_CreateObject();
-    MY_ASSERT_PTR(api->root);
-
-    api->tools    = cJSON_AddArrayToObject(api->root, "tools");
-    api->messages = cJSON_AddArrayToObject(api->root, "messages");
-
-    cJSON_AddStringToObject(api->root, "model", api->config.model);
-    cJSON_AddNumberToObject(api->root, "temperature", api->config.temperature);
-    cJSON_AddNumberToObject(api->root, "top_p", api->config.top_p);
-
-    if (api->config.max_tokens != -1) { 
-        MY_ASSERT_PTR(cJSON_AddNumberToObject(api->root, "max_tokens", api->config.max_tokens));
-    }
-
-    if (api->config.seed >= 0 && api->backend->supports_seed) { 
-        MY_ASSERT_PTR(cJSON_AddNumberToObject(api->root, "seed", api->config.seed));
-    }
-
-    if (api->config.reasoning != -1 && config.backend == MY_AIAPI_OPENROUTER) {
-        cJSON* reasoning = cJSON_CreateObject();
-        MY_ASSERT_PTR(reasoning);
-        MY_ASSERT_PTR(cJSON_AddBoolToObject(reasoning, "enabled", !!api->config.reasoning));
-        cJSON_AddItemToObject(api->root, "reasoning", reasoning);
-    }
-
-    if (api->config.presence_penalty != 0.f) {
-        MY_ASSERT_PTR(cJSON_AddNumberToObject(api->root, "presence_penalty", api->config.presence_penalty));
-    }
-
-    if (api->config.frequency_penalty != 0.f) {
-        MY_ASSERT_PTR(cJSON_AddNumberToObject(api->root, "frequency_penalty", api->config.frequency_penalty));
-    }
-
-    if (api->config.stop) {
-        MY_ASSERT(cJSON_IsString(api->config.stop) || cJSON_IsArray(api->config.stop), "`stop` must be string or array");
-        cJSON_AddItemToObject(api->root, "stop", cJSON_Duplicate(api->config.stop, true));
-    }
-
-    if (api->config.response_format) {
-        cJSON* dup_resp = cJSON_Duplicate(api->config.response_format, true);
-        MY_ASSERT_PTR(dup_resp);
-        cJSON_AddItemToObject(api->root, "response_format", dup_resp);
-    }
-
-    if (api->config.logit_bias) {
-        MY_ASSERT(cJSON_IsObject(api->config.logit_bias), "logit_bias must be object");
-        cJSON* dup_lb = cJSON_Duplicate(api->config.logit_bias, true);
-        MY_ASSERT_PTR(dup_lb);
-        cJSON_AddItemToObject(api->root, "logit_bias", dup_lb);
-    }
-
-    * ------------------------------------------------------------------ *
-    * CURL                                                               *
-    * ------------------------------------------------------------------ *
-
     api->curl = curl_easy_init();
     MY_ASSERT(api->curl, "curl_easy_init failed");
-
-    api->headers = NULL;
-    api->backend->init_headers(api);
+    backendInitHeaders[api->config.backend](api);
 
     CURLcode cres = curl_easy_setopt(api->curl, CURLOPT_POST, 1L);
     MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_POST failed: %s", curl_easy_strerror(cres)));
 
     return api;
 }
-void      MyAIAPI_Destroy       (MyAIAPI* api) {
+void            MyAIAPI_Destroy     (MyAIAPI* api) {
     MY_ASSERT_PTR(api);
-
-    if (api->root)      { cJSON_Delete(api->root); }
-    if (api->headers)   { curl_slist_free_all(api->headers); }
-    if (api->curl)      { curl_easy_cleanup(api->curl); }
-
-    MY_FREE_IF(api->response);
+    if (api->headers) { curl_slist_free_all(api->headers); }
+    if (api->curl) { curl_easy_cleanup(api->curl); }
+    MY_FREE_IF(api->buffer);
     MY_STRUCT_DESTROY_RULE(api);
 }
-
-cJSON*    MyAIAPI_Send          (MyAIAPI* api, cJSON* message) {
+const char*     MyAIAPI_Submit      (MyAIAPI* api, MyAIAPIChat* chat) {
     MY_ASSERT_PTR(api);
-    MY_ASSERT_PTR(message);
-    MY_ASSERT_PTR(api->backend);
     MY_ASSERT_PTR(api->curl);
-    MY_ASSERT_PTR(api->root);
-    MY_ASSERT_PTR(api->messages);
+    MY_ASSERT_PTR(chat);
+    MY_ASSERT_PTR(chat->messages);
 
-    MyAIAPI_HistoryInsert(api, MyAIAPI_HistorySize(api), cJSON_Duplicate(message, true));
-
-    while (true) {
-        MY_FREE_IF(api->response);
-        api->response_size = 0;
-
-        char* payload = cJSON_PrintUnformatted(api->root);
-        MY_ASSERT_PTR(payload);
-
-        CURLcode cres;
-        cres = curl_easy_setopt(api->curl, CURLOPT_URL, api->config.url);
-        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_URL failed: %s", curl_easy_strerror(cres)));
-        cres = curl_easy_setopt(api->curl, CURLOPT_HTTPHEADER, api->headers);
-        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_HTTPHEADER failed: %s", curl_easy_strerror(cres)));
-        cres = curl_easy_setopt(api->curl, CURLOPT_POSTFIELDS, payload);
-        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_POSTFIELDS failed: %s", curl_easy_strerror(cres)));
-        cres = curl_easy_setopt(api->curl, CURLOPT_WRITEFUNCTION, MyAIAPI_WriteCallback);
-        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_WRITEFUNCTION failed: %s", curl_easy_strerror(cres)));
-        cres = curl_easy_setopt(api->curl, CURLOPT_WRITEDATA, api);
-        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_WRITEDATA failed: %s", curl_easy_strerror(cres)));
-
-        if (api->config.timeout_ms > 0) {
-            cres = curl_easy_setopt(api->curl, CURLOPT_TIMEOUT_MS, api->config.timeout_ms);
-            MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_TIMEOUT_MS failed: %s", curl_easy_strerror(cres)));
-        }
-
-        if (api->config.cainfo_path) {
-            cres = curl_easy_setopt(api->curl, CURLOPT_CAINFO, api->config.cainfo_path);
-            MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_CAINFO failed: %s", curl_easy_strerror(cres)));
-        }
-
-        CURLcode res = curl_easy_perform(api->curl);
-        MY_FREE(payload);
-
-        MY_ASSERT(res == CURLE_OK, MySprintf("curl_easy_perform failed: %s", curl_easy_strerror(res)));
-        MY_ASSERT(api->response_size > 0, "Empty HTTP response");
-
-        cJSON* root = cJSON_Parse(api->response);
-        MY_ASSERT_PTR(root);
-
-        * -------------------------------------------------------------- *
-        * ERROR                                                          *
-        * -------------------------------------------------------------- *
-
-        cJSON* err = cJSON_GetObjectItem(root, "error");
-        if (err) {
-            char* e = cJSON_Print(err);
-            char buffer[1024] = {0};
-            strncpy(buffer, e ? e : "<unprintable>", sizeof(buffer));
-            cJSON_free(e);
-            MY_ASSERT(false, MySprintf("API error: %s\n", buffer));
-        }
-
-        * -------------------------------------------------------------- *
-        * CHOICES                                                        *
-        * -------------------------------------------------------------- *
-
-        cJSON* choices = cJSON_GetObjectItem(root, "choices");
-        MY_ASSERT(choices && cJSON_IsArray(choices), MySprintf("Missing choices\n%s", api->response));
-
-        cJSON* choice = cJSON_GetArrayItem(choices, 0);
-        MY_ASSERT_PTR(choice);
-
-        * -------------------------------------------------------------- *
-        * MESSAGE (OpenAI / OpenRouter / llama.cpp compatible)           *
-        * -------------------------------------------------------------- *
-
-        bool llama_msg = false;
-        cJSON* msg = cJSON_GetObjectItem(choice, "message");
-
-        if (!msg) {
-            * llama.cpp fallback *
-            cJSON* text = cJSON_GetObjectItem(choice, "text");
-            MY_ASSERT(text && cJSON_IsString(text), "Invalid llama.cpp response");
-
-            msg = cJSON_CreateObject();
-            MY_ASSERT_PTR(msg);
-            MY_ASSERT_PTR(cJSON_AddStringToObject(msg, "role", "assistant"));
-            MY_ASSERT_PTR(cJSON_AddStringToObject(msg, "content", text->valuestring));
-            llama_msg = true;
-        }
-
-        MY_ASSERT_PTR(msg);
-
-        * -------------------------------------------------------------- *
-        * TOOL CALLS                                                     *
-        * -------------------------------------------------------------- *
-
-        cJSON* tool_calls = cJSON_GetObjectItem(msg, "tool_calls");
-
-        if (tool_calls && cJSON_IsArray(tool_calls)) {
-            cJSON* dup_msg = cJSON_Duplicate(msg, true);
-            MY_ASSERT_PTR(dup_msg);
-            MyAIAPI_HistoryInsert(api, MyAIAPI_HistorySize(api), dup_msg);
-
-            cJSON* call;
-            cJSON_ArrayForEach(call, tool_calls) {
-                cJSON* id = cJSON_GetObjectItem(call, "id");
-                cJSON* fn = cJSON_GetObjectItem(call, "function");
-                MY_ASSERT_PTR(fn);
-
-                cJSON* name = cJSON_GetObjectItem(fn, "name");
-                cJSON* args_raw = cJSON_GetObjectItem(fn, "arguments");
-                MY_ASSERT_PTR(name);
-                MY_ASSERT_PTR(args_raw);
-
-                cJSON* args = NULL;
-                MY_ASSERT(api->backend->parse_tool_args(args_raw, &args), "Failed to parse tool arguments");
-
-                MyAIAPITool* tool = MyAIAPI_FindTool(api, name->valuestring);
-                MY_ASSERT(tool != NULL, MySprintf("Unknown tool requested: %s", name->valuestring));
-                MY_ASSERT_PTR(tool->fn);
-                MY_ASSERT_PTR(tool->parameters); * tool should have parameters object *
-
-                cJSON* result = tool->fn(args);
-                cJSON_Delete(args);
-                MY_ASSERT_PTR(result);
-
-                api->backend->push_tool_result(api, id ? id->valuestring : "", name->valuestring, result);
-                cJSON_Delete(result);
-            }
-
-            cJSON_Delete(root);
-            continue; * tool loop *
-        }
-
-        * -------------------------------------------------------------- *
-        * FINAL MESSAGE                                                  *
-        * -------------------------------------------------------------- *
-
-        cJSON* response = cJSON_Duplicate(msg, true);
-        MY_ASSERT_PTR(response);
-        MyAIAPI_HistoryInsert(api, MyAIAPI_HistorySize(api), response);
-
-        if (llama_msg) { cJSON_free(msg); }
-        cJSON_Delete(root);
-        return response;
-    }
-}
-
-void      MyAIAPI_ToolCreate    (MyAIAPITool* tool, const char* name, const char* description, MyAIAPIToolFn fn) {
-    MY_ASSERT_PTR(tool);
-    MY_ASSERT_PTR(name);
-    MY_ASSERT_PTR(description);
-    MY_ASSERT_PTR(fn);
-
-    tool->fn = fn;
-    tool->name = name;
-    tool->description = description;
-    tool->parameters = cJSON_CreateObject();
-    MY_ASSERT_PTR(tool->parameters);
-
-    cJSON* properties = cJSON_AddObjectToObject(tool->parameters, "properties");
-    MY_ASSERT_PTR(properties);
-    MY_ASSERT_PTR(cJSON_AddStringToObject(tool->parameters, "type", "object"));
-}
-void      MyAIAPI_ToolAddParam  (MyAIAPITool* tool, const char* name, const char* type) {
-    MY_ASSERT_PTR(tool);
-    MY_ASSERT_PTR(name);
-    MY_ASSERT_PTR(type);
-    MY_ASSERT_PTR(tool->parameters);
-
-    cJSON* properties = cJSON_GetObjectItem(tool->parameters, "properties");
-    MY_ASSERT_PTR(properties);
-
-    cJSON* parameter = cJSON_AddObjectToObject(properties, name);
-    MY_ASSERT_PTR(parameter);
-    MY_ASSERT_PTR(cJSON_AddStringToObject(parameter, "type", type));
-}
-void      MyAIAPI_ToolAttach    (MyAIAPI* api, size_t idx, MyAIAPITool tool) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_BOUNDS(idx, MY_AIAPI_TOOL_COUNT);
-    MY_ASSERT(!api->attached[idx].inUse, "Trying to attach a tool in an already attached slot");
-
-    MY_ASSERT_PTR(tool.fn);
-    MY_ASSERT_PTR(tool.name);
-    MY_ASSERT_PTR(tool.parameters);
-
-    tool.inUse = true;
-    if (tool.description == NULL) {
-        tool.description = "No description provided";
+    MyJson_KSetString(chat->root.body, "model", api->config.model);
+    if (chat->config.seed >= 0 && backendSupportsSeed[api->config.backend]) {
+        MyJson_KSetInteger(chat->root.body, "seed", chat->config.seed);
     }
 
-    for (size_t i = 0; i < MY_AIAPI_TOOL_COUNT; ++i) {
-        if (api->attached[i].inUse) {
-            MY_ASSERT(strcmp(api->attached[i].name, tool.name) != 0, MySprintf("Tool name already attached: %s", tool.name));
-        }
+    api->written = 0;
+    MY_FREE_IF(api->buffer);
+
+    char* payload = MyJsonRoot_Print(&chat->root, false);
+
+    CURLcode cres;
+    cres = curl_easy_setopt(api->curl, CURLOPT_URL, api->config.url);
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_URL failed: %s", curl_easy_strerror(cres)));
+    cres = curl_easy_setopt(api->curl, CURLOPT_HTTPHEADER, api->headers);
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_HTTPHEADER failed: %s", curl_easy_strerror(cres)));
+    cres = curl_easy_setopt(api->curl, CURLOPT_POSTFIELDS, payload);
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_POSTFIELDS failed: %s", curl_easy_strerror(cres)));
+    cres = curl_easy_setopt(api->curl, CURLOPT_POSTFIELDSIZE, (long)strlen(payload));
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_POSTFIELDSIZE failed: %s", curl_easy_strerror(cres)));
+    cres = curl_easy_setopt(api->curl, CURLOPT_WRITEFUNCTION, MyAIAPI_WriteCallback);
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_WRITEFUNCTION failed: %s", curl_easy_strerror(cres)));
+    cres = curl_easy_setopt(api->curl, CURLOPT_WRITEDATA, api);
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_WRITEDATA failed: %s", curl_easy_strerror(cres)));
+
+    if (api->config.timeoutms > 0) {
+        cres = curl_easy_setopt(api->curl, CURLOPT_TIMEOUT_MS, api->config.timeoutms);
+        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_TIMEOUT_MS failed: %s", curl_easy_strerror(cres)));
+    }
+    if (api->config.cainfoPath) {
+        cres = curl_easy_setopt(api->curl, CURLOPT_CAINFO, api->config.cainfoPath);
+        MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_setopt CURLOPT_CAINFO failed: %s", curl_easy_strerror(cres)));
     }
 
-    MyAIAPI_PushTool(api, tool.name, tool.description, tool.parameters);
-    api->attached[idx] = tool;
+    cres = curl_easy_perform(api->curl);
+    MY_FREE(payload);
+    
+    MY_ASSERT(cres == CURLE_OK, MySprintf("curl_easy_perform failed: %s", curl_easy_strerror(cres)));
+    MY_ASSERT(api->written > 0, "Empty HTTP response");
+    long status = 0;
+    curl_easy_getinfo(api->curl, CURLINFO_RESPONSE_CODE, &status);
+    MY_ASSERT(status >= 200 && status < 300, "HTTP error: %ld\n%s", status, api->buffer);
+
+    MyJsonRoot response = {0};
+    MyJsonRoot_Parse(&response, api->buffer);
+    
+    MyJson* error = MyJson_KGet(response.body, "error");
+    if (error != NULL) {
+        MyLog(MY_ERROR, "Printing response root (error founded)");
+        char* parsed = MyJsonRoot_Print(&response, true);
+        MyFilePrint(MY_LOG_STDERR_FILE, parsed);
+        MyFilePrint(MY_LOG_STDERR_FILE, "\n\n");
+        MyLog(MY_FATAL, "Yeah, nothing to do bro");
+    }
+
+    char* answer = NULL;
+    MyJson* choice = MyJson_KGetPath(response.body, "choices[0]");
+    MyJson* message = MyJson_KGet(choice, "message");
+    if (!message) {
+        /* llama.cpp fallback */
+        MyJson* text = MyJson_KGet(choice, "text");
+        MY_ASSERT(text && MyJson_IsString(text), "Invalid llama.cpp response");
+        answer = MyJson_String(text);
+    } else {
+        answer = MyJson_KGetString(message, "content");
+    }
+
+    MyJson* copy = MyJson_PushObject(chat->messages);
+    MyJson_KSetString(copy, "role", "assistant");
+    MyJson_KSetString(copy, "content", answer);
+    MyJsonRoot_Destroy(&response);
+    if (MyJson_ArraySize(chat->messages) > chat->config.maxHistory) {
+        MyJson_ArrayRemove(chat->messages, chat->config.removeIndex);
+    }
+    return (const char*)MyJson_KGetString(copy, "content");
 }
-void      MyAIAPI_ToolDetach    (MyAIAPI* api, size_t idx) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_BOUNDS(idx, MY_AIAPI_TOOL_COUNT);
-    MY_ASSERT(api->attached[idx].inUse, "Trying to deattach a tool in a free slot");
 
-    cJSON_DeleteItemFromObject(api->root, "tools");
-    api->tools = cJSON_AddArrayToObject(api->root, "tools");
-    MY_ASSERT_PTR(api->tools);
-    memset(&api->attached[idx], 0, sizeof(MyAIAPITool));
+MyAIAPIChat*    MyAIAPIChat_Create  (MyAIAPIChat* chat, MyAIAPIChatConfig config) {
+    MY_STRUCT_CREATE_RULE(chat, MyAIAPIChat);
 
-    for (size_t i = 0; i < MY_AIAPI_TOOL_COUNT; i++) {
-        if (api->attached[i].inUse) {
-            MyAIAPI_PushTool(api, api->attached[i].name, api->attached[i].description, api->attached[i].parameters);
-        }
+    chat->config = config;
+    chat->config.maxHistory     = MY_TERNARY(config.maxHistory  > 0,                             config.maxHistory,     MY_AIAPI_OPENAI_DEFAULT_HISTORY);
+    chat->config.removeIndex    = MY_TERNARY(config.removeIndex >= 0,                            config.removeIndex,    MY_AIAPI_OPENAI_DEFAULT_REMOVE_IDX);
+    chat->config.maxTokens      = MY_TERNARY((config.maxTokens  > 0 || config.maxTokens == -1),  config.maxTokens,      MY_AIAPI_OPENAI_DEFAULT_MAXTOKENS);
+    chat->config.temperature    = MY_TERNARY(config.temperature >= 0.0f,                         config.temperature,    MY_AIAPI_OPENAI_DEFAULT_TEMPERATURE);
+    chat->config.topp           = MY_TERNARY(config.topp        >= 0.0f,                         config.topp,           MY_AIAPI_OPENAI_DEFAULT_TOP_P);
+
+    MyJsonRoot_Create(&chat->root, MY_JSON_OBJECT);
+    chat->messages = MyJson_KSetArray(chat->root.body, "messages");
+    MyJson_KSetDecimal(chat->root.body, "top_p", chat->config.topp);
+    MyJson_KSetDecimal(chat->root.body, "temperature", chat->config.temperature);
+    if (chat->config.maxTokens != -1) {
+        MyJson_KSetInteger(chat->root.body, "max_tokens", chat->config.maxTokens);
+    }
+    if (chat->config.presencePenalty != 0.0f) { 
+        MyJson_KSetDecimal(chat->root.body, "presence_penalty", chat->config.presencePenalty);
+    }
+    if (chat->config.frequencyPenalty != 0.0f) { 
+        MyJson_KSetDecimal(chat->root.body, "frequency_penalty", chat->config.frequencyPenalty);
+    }
+
+    return chat;
+}
+void            MyAIAPIChat_Destroy (MyAIAPIChat* chat) {
+    MY_ASSERT_PTR(chat);
+    MyJsonRoot_Destroy(&chat->root);
+    MY_STRUCT_DESTROY_RULE(chat);
+}
+
+size_t          MyAIAPIChat_Size    (MyAIAPIChat* chat) {
+    MY_ASSERT_PTR(chat);
+    return MyJson_ArraySize(chat->messages);
+}
+MyAIAPIMsg      MyAIAPIChat_Get     (MyAIAPIChat* chat, size_t index) {
+    MY_ASSERT_PTR(chat);
+    MyJson* message = MyJson_GetObject(chat->messages, index);
+    return (MyAIAPIMsg){.text = MyJson_KGetString(message, "content"), .role = StringToRole(MyJson_KGetString(message, "role"))};
+}
+void            MyAIAPIChat_Set     (MyAIAPIChat* chat, MyAIAPIMsg msg, size_t index) {
+    MY_ASSERT_PTR(chat);
+    MyJson* message = MyJson_SetObject(chat->messages, index);
+    MyJson_KSetString(message, "role", roleToString[msg.role]);
+    MyJson_KSetString(message, "content", msg.text);
+}
+void            MyAIAPIChat_Push    (MyAIAPIChat* chat, MyAIAPIMsg msg) {
+    MY_ASSERT_PTR(chat);
+    MyJson* message = MyJson_PushObject(chat->messages);
+    MyJson_KSetString(message, "role", roleToString[msg.role]);
+    MyJson_KSetString(message, "content", msg.text);
+    if (MyJson_ArraySize(chat->messages) > chat->config.maxHistory) {
+        MyJson_ArrayRemove(chat->messages, chat->config.removeIndex);
     }
 }
-
-void      MyAIAPI_HistorySet    (MyAIAPI* api, size_t idx, cJSON* message) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_PTR(message);
-    MY_ASSERT_PTR(api->messages);
-    MY_ASSERT_BOUNDS(idx, cJSON_GetArraySize(api->messages));
-    cJSON_ReplaceItemInArray(api->messages, idx, message);
-}
-cJSON*    MyAIAPI_HistoryGet    (MyAIAPI* api, size_t idx) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_PTR(api->messages);
-    MY_ASSERT_BOUNDS(idx, cJSON_GetArraySize(api->messages));
-    return cJSON_GetArrayItem(api->messages, idx);
-}
-void      MyAIAPI_HistoryErase  (MyAIAPI* api, size_t idx) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_PTR(api->messages);
-    MY_ASSERT_BOUNDS(idx, cJSON_GetArraySize(api->messages));
-    cJSON_DeleteItemFromArray(api->messages, idx);
-}
-void      MyAIAPI_HistoryInsert (MyAIAPI* api, size_t idx, cJSON* message) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_PTR(message);
-    MY_ASSERT_PTR(api->messages);
-    MY_ASSERT_BOUNDS(idx, cJSON_GetArraySize(api->messages) + 1);
-
-    cJSON_InsertItemInArray(api->messages, idx, message);
-
-    while (cJSON_GetArraySize(api->messages) > api->config.max_history) {
-        cJSON_DeleteItemFromArray(api->messages, api->config.max_remove_idx);
+void            MyAIAPIChat_Insert  (MyAIAPIChat* chat, MyAIAPIMsg msg, size_t index) {
+    MY_ASSERT_PTR(chat);
+    MyJson* message = MyJson_InsertObject(chat->messages, index);
+    MyJson_KSetString(message, "role", roleToString[msg.role]);
+    MyJson_KSetString(message, "content", msg.text);
+    if (MyJson_ArraySize(chat->messages) > chat->config.maxHistory) {
+        MyJson_ArrayRemove(chat->messages, chat->config.removeIndex);
     }
 }
-int       MyAIAPI_HistorySize   (MyAIAPI* api) {
-    MY_ASSERT_PTR(api);
-    MY_ASSERT_PTR(api->messages);
-    return cJSON_GetArraySize(api->messages);
+void            MyAIAPIChat_Erase   (MyAIAPIChat* chat, size_t index) {
+    MY_ASSERT_PTR(chat);
+    MyJson_ArrayRemove(chat->messages, index);
 }
-
-*/
 
 #ifdef __cplusplus
 }

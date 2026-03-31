@@ -97,12 +97,13 @@ extern "C" {
         return file;
     }
     // Allocated buffer must be freed with MY_FREE
-    uint8_t* MyFileDump(const char* path, size_t* size) {
+    char* MyFileDump(const char* path, size_t* size) {
         MyFile* file = MyFileOpen(path, MY_FILE_READ);
         size_t _size = MyFileSize(file);
         char* bytes = NULL;
-        MY_CALLOC(bytes, char, _size);
+        MY_CALLOC(bytes, char, _size + 1);
         MyFileRead(file, bytes, _size);
+        bytes[_size] = '\0';
         MyFileClose(file);
         if (size) { *size = _size; }
         return (uint8_t*)bytes;

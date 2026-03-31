@@ -6,111 +6,138 @@
 #include <curl/curl.h>
 #include <cJSON/cJSON.h>
 
-#ifndef MY_AIAPI_TOOL_COUNT
-    #define MY_AIAPI_TOOL_COUNT 32
-#endif
+/*
+
+MyAIAPI MyAIAPI_Create();
+void    MyAIAPI_Destroy();
+void    MyAIAPI_Submit(MyAIAPIChat* chat);
+
+MyAIAPIChat MyAIAPIChat_Create();
+void        MyAIAPIChat_Destroy();
+
+void        MyAIAPIChat_InsertUser();
+void        MyAIAPIChat_InsertSystem();
+
+*/
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum MyAIAPIBackend {
+typedef enum {
     MY_AIAPI_OPENAI,
     MY_AIAPI_OPENROUTER,
     MY_AIAPI_LLAMA_CPP
 } MyAIAPIBackend;
 
-struct MyAIAPI;
-struct MyAIAPITool;
-struct MyAIAPIConfig;
-struct MyAIAPIBackendOps;
+typedef enum {
+    MY_AIAPI_ROLE_SYSTEM,
+    MY_AIAPI_ROLE_ASSISTANT,
+    MY_AIAPI_ROLE_USER
+} MyAIAPIChatRole;
 
-typedef struct MyAIAPI MyAIAPI;
-typedef struct MyAIAPITool MyAIAPITool;
-typedef struct MyAIAPIConfig MyAIAPIConfig;
-typedef struct MyAIAPIBackendOps MyAIAPIBackendOps;
+typedef struct {
+    const char* text;
+    MyAIAPIChatRole role;
+} MyAIAPIChatMsg;
 
-/* 
- * Tool function must return a newly allocated cJSON*.
- * Ownership is transferred to Openai and it will be deleted.
- * Do not cJSON_Delete(args)
- */
-typedef cJSON* (*MyAIAPIToolFn)(cJSON* args);
+#define MY_VECTOR_NAME              MyVecAIAPIChatMsg
+#define MY_VECTOR_DATA_TYPE         MyAIAPIChatMsg
+#ifdef MY_AIAPI_VECTOR
+    #define MY_VECTOR_INITIAL_SIZE  30
+    #define MY_VECTOR_IMPLEMENTATION
+#endif
+#include <mystd/vector.h>
 
-MY_RWLOCK_DECLARES(MyAIAPI, api, MyAIAPI)
-
-MyAIAPI*    MyAIAPI_Create          (MyAIAPI* api, MyAIAPIConfig config);
-void        MyAIAPI_Destroy         (MyAIAPI* api);
-cJSON*      MyAIAPI_Send            (MyAIAPI* api, cJSON* message);
-
-void        MyAIAPI_ToolCreate      (MyAIAPITool* tool, const char* name, const char* description, MyAIAPIToolFn fn);
-void        MyAIAPI_ToolAddParam    (MyAIAPITool* tool, const char* name, const char* type);
-void        MyAIAPI_ToolAttach      (MyAIAPI* api, size_t idx, MyAIAPITool tool);
-void        MyAIAPI_ToolDetach      (MyAIAPI* api, size_t idx);
-
-void        MyAIAPI_HistorySet      (MyAIAPI* api, size_t idx, cJSON* message);
-cJSON*      MyAIAPI_HistoryGet      (MyAIAPI* api, size_t idx);
-void        MyAIAPI_HistoryErase    (MyAIAPI* api, size_t idx);
-void        MyAIAPI_HistoryInsert   (MyAIAPI* api, size_t idx, cJSON* message);
-int         MyAIAPI_HistorySize     (MyAIAPI* api);
-
-struct MyAIAPIBackendOps {
-    void    (*init_headers)     (MyAIAPI*);
-    bool    (*parse_tool_args)  (cJSON* raw, cJSON** out);
-    void    (*push_tool_result) (MyAIAPI*, const char*, const char*, cJSON*);
-    bool    supports_seed;
-};
-
-struct MyAIAPIConfig {
+/*
+    const MyAIAPIChatConfig aiapiConfig = {
+        .backend        = [BACKEND],
+        .url            = [URL],
+        .model          = [BACKEND],
+        .apiKey         = [API KEY],
+        .xtitle         = NULL,
+        .httpReferer    = NULL,
+        .cainfoPath     = NULL,
+        .timeoutms      = 0,
+    };
+*/
+typedef struct {
     MyAIAPIBackend  backend;
-
     const char*     url;                /* API endpoint; default provided below */
     const char*     model;              /* model id */
-    const char*     api_key;            /* required */
-    const char*     x_title;            /* optional X-Title header */
-    const char*     http_referer;       /* optional Referer header */
-    const char*     cainfo_path;        /* optional path to cacert.pem */
+    const char*     apiKey;             /* required */
+    const char*     xtitle;             /* optional X-Title header */
+    const char*     httpReferer;        /* optional Referer header */
+    const char*     cainfoPath;         /* optional path to cacert.pem */
+    long            timeoutms;          /*  0     = default (no explicit timeout) */
+} MyAIAPIConfig;
 
+typedef struct {
+    MyStructHeader              header;
+
+    struct curl_slist*          headers;
+    CURL*                       curl;
+    char*                       buffer;
+    size_t                      written;
+
+    MyAIAPIConfig               config;
+} MyAIAPI;
+
+/*
+    const MyAIAPIChatConfig chatConfig = {
+        .seed               = -1,
+        .reasoning          = -1,
+        .maxHistory         = -1,
+        .maxRemoveIdx       = 0,
+        .maxTokens          = 0,
+        .temperature        = 0.5f,
+        .topp               = 0.5f,
+        .presencePenalty    = 0,
+        .frequencyPenalty   = NULL,
+        .stop               = NULL,
+        .responseFormat     = NULL,
+        .logitBias          = NULL
+    };
+*/
+typedef struct {
     int             seed;               /* -1 = unset */
     int             reasoning;          /* -1 = no data send */
-    int             max_history;        /* -1     = default (15 messages) */
-    int             max_remove_idx;     /* idx to remove message when history gets to its max, this allows to keep system message without weird logic */
-    int             max_tokens;         /* 0      = default (200 tokens) | -1 = no data send*/
-    long            timeout_ms;         /*  0     = default (no explicit timeout) */
+    int             maxHistory;         /* -1     = default (15 messages) */
+    int             maxRemoveIdx;       /* idx to remove message when history gets to its max, this allows to keep system message without weird logic */
+    int             maxTokens;          /* 0      = default (200 tokens) | -1 = no data send*/
     float           temperature;        /* -1.0f  = default (0.5f) */
-    float           top_p;              /* -1.0f  = default (0.5f) */
-    float           presence_penalty;   /*  0     = no effect */
-    float           frequency_penalty;  /*  0     = no effect */
+    float           topp;               /* -1.0f  = default (0.5f) */
+    float           presencePenalty;    /*  0     = no effect */
+    float           frequencyPenalty;   /*  0     = no effect */
     cJSON*          stop;               /* array or string (owned by caller) */
-    cJSON*          response_format;    /* JSON schema / type */
-    cJSON*          logit_bias;         /* object */    
-};
+    cJSON*          responseFormat;     /* JSON schema / type */
+    cJSON*          logitBias;          /* object */    
+} MyAIAPIChatConfig;
 
-struct MyAIAPITool {
-    bool            in_use;
-    const char*     name;
-    const char*     description;
-    cJSON*          parameters;
-    MyAIAPIToolFn   fn;
-};
-
-struct MyAIAPI {
+typedef struct {
     MyStructHeader              header;
 
     cJSON*                      root;
     cJSON*                      tools;
     cJSON*                      messages;
+    MyAIAPIChatConfig*          config;
+    MyVecAIAPIChatMsg           history;
+} MyAIAPIChat;
 
-    CURL*                       curl;
-    struct curl_slist*          headers;
+MY_RWLOCK_DECLARES(MyAIAPI, api, MyAIAPI)
 
-    char*                       response;
-    size_t                      response_size;
+MyAIAPI*        MyAIAPI_Create      (MyAIAPI* api, MyAIAPIConfig config);
+void            MyAIAPI_Destroy     (MyAIAPI* api);
+void            MyAIAPI_Submmit     (MyAIAPI* api, MyAIAPIChat* chat);
 
-    MyAIAPITool                 attached[MY_AIAPI_TOOL_COUNT];
-    MyAIAPIConfig               config;
-    const MyAIAPIBackendOps*    backend;
-};
+MyAIAPIChat*    MyAIAPIChat_Create  (MyAIAPIChat* chat, MyAIAPIChatConfig config);
+void            MyAIAPIChat_Destroy (MyAIAPIChat* chat);
+
+MyAIAPIChatMsg  MyAIAPIChat_Get     (MyAIAPIChat* chat, size_t idx);
+void            MyAIAPIChat_Set     (MyAIAPIChat* chat, MyAIAPIChatMsg msg, size_t idx);
+void            MyAIAPIChat_Push    (MyAIAPIChat* chat, MyAIAPIChatMsg msg);
+void            MyAIAPIChat_Insert  (MyAIAPIChat* chat, MyAIAPIChatMsg msg, size_t idx);
+void            MyAIAPIChat_Erase   (MyAIAPIChat* chat, size_t idx);
 
 #ifdef __cplusplus
 }

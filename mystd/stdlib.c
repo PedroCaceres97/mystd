@@ -14,7 +14,7 @@ extern "C" {
     #define MY_ASSERT_WINBOOL(x) MY_ASSERT_WIN(x != 0)
     #define MY_ASSERT_WINHANDLE(x) MY_ASSERT_WIN((x) != INVALID_HANDLE_VALUE && (x) != NULL)
 
-    void MyWindowsPrintLastError(MyContext context) {
+    static void MyWindowsPrintLastError(MyContext context) {
         LPVOID lpMsgBuf;
         DWORD dw = GetLastError(); 
         MyLogCtx(MY_ERROR,  context, "Windows API error, next message will provide OS error message");
@@ -509,6 +509,15 @@ const char* MyPtrdifftos(ptrdiff_t value) {
 #else
     MY_ASSERT(false, "Unsupported ptrdiff_t size");
 #endif
+}
+
+char* MyStrdup(const char* src, size_t* size) {
+    size_t length = strlen(src);
+    char* dup = NULL;
+    MY_MALLOC(dup, char, length + 1);
+    memcpy(dup, src, length);
+    dup[length] = '\0';
+    return dup;
 }
 
 static thread_local char myPathBuffers[MY_PATH_BUFFER_COUNT][MY_PATH_BUFFER_SIZE];
@@ -1023,15 +1032,13 @@ static void MyPrintfSpec_Parse(MyPrintfData* data) {
     */
     if (MyPrintf_AdvanceIfEq(data, 'z')) {
         data->spec.lengthZ = true;
-        return;
-    }
-    if (MyPrintf_AdvanceIfEq(data, 'l')) {
+    } else if (MyPrintf_AdvanceIfEq(data, 'l')) {
         MyPrintf_AdvanceIfEq(data, 'l');
         data->spec.lengthL = true;
-        return;
+    } else {
+        MyPrintf_AdvanceIfEq(data, 'h');
+        MyPrintf_AdvanceIfEq(data, 'h');
     }
-    MyPrintf_AdvanceIfEq(data, 'h');
-    MyPrintf_AdvanceIfEq(data, 'h');
 
     /*  
         Parse Specifier
@@ -1432,7 +1439,7 @@ void MyLogCtx(MyLogLevel level, MyContext context, const char* msg) {
 
     if (MyFileIsStd(file)) {
         MySnprintfSegments(buffer, sizeof(buffer),
-        SEG("", "%s\n", STR(title)),
+        SEG("F*", "%s\n", I32(color), STR(title)),
         SEG("F*", "Context: ", I32(MY_LABEL_COLOR)),
         SEG("F* S2", "%s:%u -> %s()\n", I32(MY_CONTEXT_COLOR), STR(context.file), I32(context.line), STR(context.func)),
         SEG("F*", "Message: ", I32(MY_LABEL_COLOR)),

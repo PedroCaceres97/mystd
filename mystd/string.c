@@ -1,3 +1,4 @@
+#include "mystd/stdlib.h"
 #include <mystd/string.h>
 
 #ifdef __cplusplus
@@ -31,17 +32,17 @@ size_t      MyString_Size       (MyString* str) {
     return str->size;
 }
 
-void        MyString_Set        (MyString* str, size_t idx, char c) {
+void        MyString_Set        (MyString* str, size_t index, char ch) {
     MY_ASSERT_PTR(str);
-    MY_ASSERT_BOUNDS(idx, str->size);
+    MY_ASSERT_BOUNDS(index, str->size);
 
-    str->data[idx] = c;
+    str->data[index] = ch;
 }
-char        MyString_Get        (MyString* str, size_t idx) {
+char        MyString_Get        (MyString* str, size_t index) {
     MY_ASSERT_PTR(str);
-    MY_ASSERT_BOUNDS(idx, str->size);
+    MY_ASSERT_BOUNDS(index, str->size);
 
-    return str->data[idx];
+    return str->data[index];
 }
 void        MyString_Resize     (MyString* str, size_t size) {
     MY_ASSERT_PTR(str);
@@ -55,25 +56,39 @@ void        MyString_Resize     (MyString* str, size_t size) {
         return;
     }
 
-    str->capacity = MY_TERNARY(
-        size < MY_STRING_INITIAL_SIZE,
-        MY_STRING_INITIAL_SIZE,
-        MY_STRING_RESIZE_POLICIE(size)
-    );
+    if (size > str->capacity) {
+        str->capacity = MY_TERNARY(
+            size < MY_STRING_INITIAL_SIZE,
+            MY_STRING_INITIAL_SIZE,
+            MY_STRING_RESIZE_POLICIE(size)
+        );
+        MY_REALLOC(str->data, char, str->data, str->capacity + 1);
+        memset(&str->data[str->size], 0, (str->capacity - str->size) + 1);
+    }
 
-    char* data = NULL;
-    MY_CALLOC(data, char, str->capacity + 1);
-    memcpy(data, str->data, MY_MIN(str->size, size));
-
-    MY_FREE(str->data);
-    str->data = data;
     str->size = size;
     str->data[str->size] = '\0';
+}
+void        MyString_Reserve    (MyString* str, size_t capacity) {
+    MY_ASSERT_PTR(str);
+
+    if (capacity <= str->capacity) {
+        return;
+    }
+
+    if (capacity == 0) {
+        MyString_Clear(str);
+        return;
+    }
+
+    str->capacity = capacity;
+    MY_REALLOC(str->data, char, str->data, str->capacity + 1);
+    memset(&str->data[str->size], 0, (str->capacity - str->size) + 1);
 }
 void        MyString_Shrink     (MyString* str) {
     MY_ASSERT_PTR(str);
 
-    if (str->size < MY_STRING_SHRINK_POLICIE(str->capacity) && str->size < MY_STRING_INITIAL_SIZE) {
+    if (str->size < MY_STRING_SHRINK_POLICIE(str->capacity) && str->size > MY_STRING_INITIAL_SIZE) {
         str->capacity = MY_STRING_RESIZE_POLICIE(str->size);
 
         char* data = NULL;
@@ -89,17 +104,15 @@ void        MyString_Clear      (MyString* str) {
     MY_ASSERT_PTR(str);
 
     str->size = 0;
-    str->capacity = MY_STRING_INITIAL_SIZE;
-    MY_FREE(str->data);
-    MY_CALLOC(str->data, char, str->capacity + 1);
+    str->data[0] = '\0';
 }
 
-void        MyString_Erase      (MyString* str, size_t idx) {
+void        MyString_Erase      (MyString* str, size_t index) {
     MY_ASSERT_PTR(str);
-    MY_ASSERT_BOUNDS(idx, str->size);
+    MY_ASSERT_BOUNDS(index, str->size);
 
-    if (idx != str->size - 1) {
-        memmove(&str->data[idx], &str->data[idx + 1], (str->size - idx - 1));
+    if (index != str->size - 1) {
+        memmove(&str->data[index], &str->data[index + 1], (str->size - index - 1));
     }
 
     str->size--;
@@ -125,58 +138,89 @@ void        MyString_PopFront   (MyString* str) {
     MyString_Erase(str, 0);
 }
 
-void        MyString_Insert     (MyString* str, size_t idx, char c) {
+void        MyString_Insert     (MyString* str, size_t index, char ch) {
     MY_ASSERT_PTR(str);
-    MY_ASSERT_BOUNDS(idx, str->size + 1);
+    MY_ASSERT_BOUNDS(index, str->size + 1);
 
     if (str->size != str->capacity) {
-        if (idx != str->size) {
-            memmove(&str->data[idx + 1], &str->data[idx], (str->size - idx));
+        if (index != str->size) {
+            memmove(&str->data[index + 1], &str->data[index], (str->size - index));
         }
-    } else {
-        str->capacity = MY_STRING_RESIZE_POLICIE(str->size);
-        char* data = NULL;
-        MY_CALLOC(data, char, str->capacity + 1);
-
-        if (idx != 0) {
-            memcpy(data, str->data, idx);
-        }
-
-        if (idx != str->size) {
-            memcpy(&data[idx + 1], &str->data[idx], (str->size - idx));
-        }
-
-        MY_FREE(str->data);
-        str->data = data;
+        goto end;
     }
 
+    str->capacity = MY_STRING_RESIZE_POLICIE(str->size);
+    char* data = NULL;
+    MY_CALLOC(data, char, str->capacity + 1);
+
+    if (index != 0) {
+        memcpy(data, str->data, index);
+    }
+
+    if (index != str->size) {
+        memcpy(&data[index + 1], &str->data[index], (str->size - index));
+    }
+
+    MY_FREE(str->data);
+    str->data = data;
+
+end:
     str->size++;
-    str->data[idx] = c;
+    str->data[index] = ch;
     str->data[str->size] = '\0';
 }
-void        MyString_PushBack   (MyString* str, char c) {
+void        MyString_PushBack   (MyString* str, char ch) {
     MY_ASSERT_PTR(str);
-
-    MyString_Insert(str, str->size, c);
+    MyString_Insert(str, str->size, ch);
 }
-void        MyString_PushFront  (MyString* str, char c) {
+void        MyString_PushFront  (MyString* str, char ch) {
     MY_ASSERT_PTR(str);
-
-    MyString_Insert(str, 0, c);
+    MyString_Insert(str, 0, ch);
 }
 
-void        MyString_Memcpy     (MyString* str, size_t idx, const void* src, size_t count) {
+void        MyString_Memset     (MyString* str, char ch, size_t start, size_t count) {
+    MY_ASSERT_PTR(str);
+    if (count == 0) { return; }
+
+    MY_ASSERT_BOUNDS(start, str->size);
+    MY_ASSERT_BOUNDS(start + (count - 1), str->size);
+    memset(&str->data[start], ch, count);
+    str->data[str->size] = '\0';
+}
+void        MyString_Memcpy     (MyString* str, const void* src, size_t start, size_t count) {
+    MY_ASSERT_PTR(str);
+    MY_ASSERT_PTR(src);
+    if (count == 0) { return; }
+
+    MY_ASSERT_BOUNDS(start, str->size);
+    MY_ASSERT_BOUNDS(start + (count - 1), str->size);
+    memcpy(&str->data[start], src, count);
+    str->data[str->size] = '\0';
+}
+
+void        MyString_AppendCh   (MyString* str, char ch, size_t count) {
+    MY_ASSERT_PTR(str);
+    if (count == 0) { return; }
+
+    size_t size = str->size;
+    MyString_Resize(str, size + count);
+    MyString_Memset(str, ch, size, count);
+}
+void        MyString_AppendN    (MyString* str, const char* src, size_t count) {
+    MY_ASSERT_PTR(str);
+    MY_ASSERT_PTR(src);
+    if (count == 0) { return; }
+
+    size_t size = str->size;
+    MyString_Resize(str, size + count);
+    MyString_Memcpy(str, src, size, count);
+}
+void        MyString_Append     (MyString* str, const char* src) {
     MY_ASSERT_PTR(str);
     MY_ASSERT_PTR(src);
 
-    if (count == 0) {
-        return;
-    }
-
-    MY_ASSERT_BOUNDS(idx, str->size);
-    MY_ASSERT_BOUNDS(idx + count, str->size + 1);
-
-    memcpy(&str->data[idx], src, count);
+    size_t length = strlen(src);
+    MyString_AppendN(str, src, length);
 }
 
 #ifdef __cplusplus

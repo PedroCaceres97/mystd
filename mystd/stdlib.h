@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -170,7 +171,7 @@ typedef struct MyStructHeader {
 } MyStructHeader;
 
 #define MY_STRUCT_CREATE_RULE(v, type)  do { if ((v) == NULL) { MY_CALLOC(v, type, 1); (v)->header.allocated = true; } else { (v)->header.allocated = false; } MY_RWLOCK_INIT((v)->header.lock);    } while(0)
-#define MY_STRUCT_DESTROY_RULE(v)       do { MY_RWLOCK_DESTROY((v)->header.lock); if (!(v)->header.allocated) { MY_FREE((v)); } (v) = NULL;                                                         } while(0)
+#define MY_STRUCT_DESTROY_RULE(v)       do { MY_RWLOCK_DESTROY((v)->header.lock); if ((v)->header.allocated) { MY_FREE((v)); } (v) = NULL;                                                          } while(0)
 #define MY_RWLOCK_DECLARES(vtype, vname, fnprefix) \
     void MY_CONCAT2(fnprefix, _Rdlock)   (vtype* vname); \
     void MY_CONCAT2(fnprefix, _Wrlock)   (vtype* vname); \
@@ -383,9 +384,12 @@ const char* MyPtrdifftos(ptrdiff_t value);
     #define MY_PATH_BUFFER_COUNT 8
 #endif
 
+char* MyStrdup(const char* src, size_t* size);
+
 char* MyNormalizedPath(char* path);
 char* MyFirstPathDivisor(char* path);
 char* MyLastPathDivisor(char* path);
+
 
 /* ANSI escape code sequences -------------------------- */
 

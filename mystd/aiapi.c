@@ -145,7 +145,7 @@ const char*     MyAIAPI_Submit      (MyAIAPI* api, MyAIAPIChat* chat) {
     api->written = 0;
     MY_FREE_IF(api->buffer);
 
-    char* payload = MyJsonRoot_Print(&chat->root, false);
+    char* payload = MyJson_Print(chat->root.body, false);
 
     CURLcode cres;
     cres = curl_easy_setopt(api->curl, CURLOPT_URL, api->config.url);
@@ -185,9 +185,10 @@ const char*     MyAIAPI_Submit      (MyAIAPI* api, MyAIAPIChat* chat) {
     MyJson* error = MyJson_KGet(response.body, "error");
     if (error != NULL) {
         MyLog(MY_ERROR, "Printing response root (error founded)");
-        char* parsed = MyJsonRoot_Print(&response, true);
+        char* parsed = MyJson_Print(error, true);
         MyFilePrint(MY_LOG_STDERR_FILE, parsed);
         MyFilePrint(MY_LOG_STDERR_FILE, "\n\n");
+        MY_FREE(parsed);
         MyLog(MY_FATAL, "Yeah, nothing to do bro");
     }
 
@@ -219,7 +220,7 @@ MyAIAPIChat*    MyAIAPIChat_Create  (MyAIAPIChat* chat, MyAIAPIChatConfig config
     chat->config = config;
     chat->config.maxHistory     = MY_TERNARY(config.maxHistory  > 0,                             config.maxHistory,     MY_AIAPI_OPENAI_DEFAULT_HISTORY);
     chat->config.removeIndex    = MY_TERNARY(config.removeIndex >= 0,                            config.removeIndex,    MY_AIAPI_OPENAI_DEFAULT_REMOVE_IDX);
-    chat->config.maxTokens      = MY_TERNARY((config.maxTokens  > 0 || config.maxTokens == -1),  config.maxTokens,      MY_AIAPI_OPENAI_DEFAULT_MAXTOKENS);
+    chat->config.maxTokens      = MY_TERNARY(config.maxTokens   > 0 && config.maxTokens != -1,   config.maxTokens,      MY_AIAPI_OPENAI_DEFAULT_MAXTOKENS);
     chat->config.temperature    = MY_TERNARY(config.temperature >= 0.0f,                         config.temperature,    MY_AIAPI_OPENAI_DEFAULT_TEMPERATURE);
     chat->config.topp           = MY_TERNARY(config.topp        >= 0.0f,                         config.topp,           MY_AIAPI_OPENAI_DEFAULT_TOP_P);
 

@@ -23,17 +23,19 @@ typedef enum {
 #define MY_VECTOR_DATA_TYPE     MyJson*
 #include <mystd/vector.h>
 
-struct MyJson {
-    MyJsonType type;
-    char* key;
+typedef union {
+    bool            boolean;
+    int64_t         integer;
+    double          decimal;
+    char*           string;
+    MyJsonArray     array;
+} MyJsonData;
 
-    union {
-        bool            boolean;
-        int64_t         integer;
-        double          decimal;
-        char*           string;
-        MyJsonArray     array;
-    } data;
+struct MyJson {
+    char*       key;
+    MyJsonData  data;
+    MyJsonType  type;
+    bool        allocated;
 };
 
 typedef struct {
@@ -53,9 +55,9 @@ MY_RWLOCK_DECLARES(MyJson, json, MyJson)
 MyJsonRoot* MyJsonRoot_Create       (MyJsonRoot* root, MyJsonType type);
 void        MyJsonRoot_Destroy      (MyJsonRoot* root);
 MyJson*     MyJsonRoot_GetBody      (MyJsonRoot* root);
-
 MyJsonRoot* MyJsonRoot_Parse        (MyJsonRoot* root, const char* source);
-char*       MyJsonRoot_Print        (MyJsonRoot* root, bool pretty);
+
+char*       MyJson_Print            (MyJson* json, bool pretty);
 
 const char* MyJson_Key              (MyJson* json);
 MyJsonType  MyJson_Type             (MyJson* json);

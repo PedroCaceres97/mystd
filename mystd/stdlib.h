@@ -6,9 +6,10 @@
  * -------------------------------------------------------------------------- */
 
 #include <math.h>
+#include <time.h>
 #include <ctype.h>
-#include <stddef.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -335,12 +336,9 @@ MyFile* MyStderr();
 
 void MyFileClose(MyFile* file);
 MyFile* MyFileOpen(const char* path, MyFileFlag flag);
-// Allocated buffer must be freed with MY_FREE
-char* MyFileDump(const char* path, size_t* size);
 
 size_t MyFileRead(MyFile* file, char* data, size_t max);
 size_t MyFileWrite(MyFile* file, const char* data, size_t max);
-size_t MyFilePrint(MyFile* file, const char* data);
 
 size_t MyFileSize(MyFile* file);
 size_t MyFileSeek(MyFile* file, MySeekFlag flag, ptrdiff_t offset);
@@ -348,6 +346,20 @@ size_t MyFileSeek(MyFile* file, MySeekFlag flag, ptrdiff_t offset);
 void MyMakeDir(const char* dir);
 bool MyDirExists(const char* dir);
 bool MyFileExists(const char* file);
+
+// Allocated buffer must be freed with MY_FREE
+char* MyFileDump(const char* path, size_t* size);
+size_t MyFilePrint(MyFile* file, const char* data);
+size_t MyPrint(const char* data);
+size_t MyRead(char* data, size_t max);
+
+#ifndef MY_GETS_BUFFER_SIZE
+    #define MY_GETS_BUFFER_SIZE 1024
+#endif
+#ifndef MY_GETS_BUFFER_COUNT
+    #define MY_GETS_BUFFER_COUNT 4
+#endif
+char* MyGets();
 
 /* String related functions --------------------------------- */
 
@@ -386,9 +398,9 @@ const char* MyPtrdifftos(ptrdiff_t value);
 
 char* MyStrdup(const char* src, size_t* size);
 
-char* MyNormalizedPath(char* path);
-char* MyFirstPathDivisor(char* path);
-char* MyLastPathDivisor(char* path);
+char* MyNormalizedPath(const char* path);
+char* MyFirstPathDivisor(const char* path);
+char* MyLastPathDivisor(const char* path);
 
 
 /* ANSI escape code sequences -------------------------- */

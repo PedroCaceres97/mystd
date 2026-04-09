@@ -1,1 +1,1 @@
-gcc -O3 -g %1.c -o %1.exe
+gcc -O3 -g -std=c23 -I.. %1.c -o %1.exe

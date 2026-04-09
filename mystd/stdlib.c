@@ -96,18 +96,6 @@ extern "C" {
         MY_ASSERT_WINHANDLE(file->handle);
         return file;
     }
-    // Allocated buffer must be freed with MY_FREE
-    char* MyFileDump(const char* path, size_t* size) {
-        MyFile* file = MyFileOpen(path, MY_FILE_READ);
-        size_t _size = MyFileSize(file);
-        char* bytes = NULL;
-        MY_CALLOC(bytes, char, _size + 1);
-        MyFileRead(file, bytes, _size);
-        bytes[_size] = '\0';
-        MyFileClose(file);
-        if (size) { *size = _size; }
-        return (uint8_t*)bytes;
-    }
 
     size_t MyFileRead(MyFile* file, char* data, size_t max) {
         MY_ASSERT_PTR(file);
@@ -116,10 +104,11 @@ extern "C" {
 
         if (max == 0) { return 0; }
 
-        DWORD read = 0;
-        BOOL result = ReadFile(file->handle, data, max, &read, NULL);
+        DWORD readed = 0;
+        BOOL result = ReadFile(file->handle, data, max - 1, &readed, NULL);
         MY_ASSERT_WINBOOL(result);
-        return (size_t)read;
+        data[readed] = '\0';
+        return (size_t)readed;
     }
     size_t MyFileWrite(MyFile* file, const char* data, size_t max) {
         MY_ASSERT_PTR(file);
@@ -132,9 +121,6 @@ extern "C" {
         BOOL result = WriteFile(file->handle, data, max, &written, NULL);
         MY_ASSERT_WINBOOL(result);
         return (size_t)written;
-    }
-    size_t MyFilePrint(MyFile* file, const char* data) {
-        return MyFileWrite(file, data, strlen(data));
     }
 
     size_t MyFileSize(MyFile* file) {
@@ -166,7 +152,7 @@ extern "C" {
         MY_ASSERT_PTR(path);
         if (MyDirExists(path)) { return; }
 
-        char* temp = MyNormalizedPath((char*)path);
+        char* temp = MyNormalizedPath(path);
         size_t len = strlen(temp);
 
         /* Skip drive letter */
@@ -186,19 +172,54 @@ extern "C" {
     }
     bool MyDirExists(const char* path) {
         MY_ASSERT_PTR(path);
-        char* temp = MyNormalizedPath((char*)path);
+        char* temp = MyNormalizedPath(path);
         struct _stat st;
         return _stat(temp, &st) == 0 && st.st_mode & _S_IFDIR;
     }
     bool MyFileExists(const char* path) {
         MY_ASSERT_PTR(path);
-        char* temp = MyNormalizedPath(temp);
+        char* temp = MyNormalizedPath(path);
         struct _stat st;
         return _stat(temp, &st) == 0 && st.st_mode & _S_IFREG;
     }
 #elif defined(MY_OS_LINUX)
 
 #endif
+
+// Allocated buffer must be freed with MY_FREE
+char* MyFileDump(const char* path, size_t* size) {
+    MyFile* file = MyFileOpen(path, MY_FILE_READ);
+    size_t _size = MyFileSize(file);
+    char* bytes = NULL;
+    MY_CALLOC(bytes, char, _size + 1);
+    MyFileRead(file, bytes, _size);
+    bytes[_size] = '\0';
+    MyFileClose(file);
+    if (size) { *size = _size; }
+    return bytes;
+}
+size_t MyFilePrint(MyFile* file, const char* data) {
+    return MyFileWrite(file, data, strlen(data));
+}
+size_t MyPrint(const char* data) {
+    return MyFileWrite(MyStdout(), data, strlen(data));
+}
+size_t MyRead(char* data, size_t max) {
+    return MyFileRead(MyStdin(), data, max);
+}
+
+static thread_local char myGetsBuffers[MY_GETS_BUFFER_COUNT][MY_GETS_BUFFER_SIZE];
+static thread_local uint32_t myGetsIndex = 0;
+static inline char* MyGetsNextBuffer() {
+    myGetsIndex++;
+    if (myGetsIndex == MY_GETS_BUFFER_COUNT) { myGetsIndex = 0; }
+    return myGetsBuffers[myGetsIndex];
+}
+char* MyGets() {
+    char* buffer = MyGetsNextBuffer();
+    MyFileRead(MyStdin(), buffer, MY_GETS_BUFFER_SIZE);
+    return buffer;
+}
 
 /* String related functions --------------------------------- */
 
@@ -529,7 +550,7 @@ static inline char* MyPathNextBuffer() {
     return myPathBuffers[myPathIndex];
 }
 
-char* MyNormalizedPath(char* path) {
+char* MyNormalizedPath(const char* path) {
     MY_ASSERT_PTR(path);
     size_t len = strlen(path);
     char* buffer = MyPathNextBuffer();
@@ -544,12 +565,12 @@ char* MyNormalizedPath(char* path) {
     }
     return buffer;
 }
-char* MyFirstPathDivisor(char* path) {
+char* MyFirstPathDivisor(const char* path) {
     char* p = strchr(path, '/');
     if (!p) { p = strchr(path, '\\'); }
     return p;
 }
-char* MyLastPathDivisor(char* path) {
+char* MyLastPathDivisor(const char* path) {
     char* p = strrchr(path, '/');
     if (!p) { p = strrchr(path, '\\'); }
     return p;
@@ -1570,6 +1591,7 @@ bool MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char* const* argv, int
     MyArgvFlag* shortNameJumpTable[256] = {0};
     for (size_t i = 0; i < flagsc; i++) {
         if (flags[i]->shortName == 0 || flags[i]->shortName == '~') { continue; }
+        MY_ASSERT(shortNameJumpTable[(unsigned char)flags[i]->shortName] == 0, "Repeating short flag -> %c (%s)", flags[i]->shortName, flags[i]->longName);
         shortNameJumpTable[(unsigned char)flags[i]->shortName] = flags[i];
     }
     
@@ -1583,7 +1605,7 @@ bool MyArgvParse(MyArgvFlag** flags, size_t flagsc, const char* const* argv, int
         if (arg[1] == '\0') { MyArgvUnkownFlagCallback(arg); continue; } // Ignoring "-"
         if (strcmp(arg, "--help") == 0) { 
             MY_ASSERT(next != NULL && next[0] != '\0', "Correct usage: --help [flag] or --help [short flag]");
-            if (!MyArgvParseHelp(shortNameJumpTable, flags, flagsc, next)) { MyArgvUnkownFlagCallback(arg); }
+            if (!MyArgvParseHelp(shortNameJumpTable, flags, flagsc, next)) { MyArgvUnkownFlagCallback(argv[i + 1]); }
             help = true;
             i++;
             continue;

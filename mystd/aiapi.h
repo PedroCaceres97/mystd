@@ -77,13 +77,13 @@ typedef struct {
 typedef struct {
     int     seed;               /* -1       = unset */
     int     reasoning;          /* -1       = no data send */
-    int     maxHistory;         /* -1       = default (30) */
-    int     removeIndex;        /* -1       = default (0) | Index used to remove chat messages when history sizes reaches maxHistory, this allows keeping system messages */
     int     maxTokens;          /* 0        = default (200 tokens) | -1 = no data send*/
     float   temperature;        /* -1.0f    = default (0.5f) */
     float   topp;               /* -1.0f    = default (0.5f) */
     float   presencePenalty;    /*  0       = no effect */
     float   frequencyPenalty;   /*  0       = no effect */
+    size_t  maxHistory;         /* -1       = default (30) */
+    size_t  removeIndex;        /* -1       = default (0) | Index used to remove chat messages when history sizes reaches maxHistory, this allows keeping system messages */
 } MyAIAPIChatConfig;
 
 MyAIAPIChatConfig MyAIAPI_DefaultChatConfig(int removeIndex);
